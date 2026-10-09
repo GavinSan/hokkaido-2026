@@ -1,0 +1,40 @@
+set -e
+ESB=/home/claude/.npm-global/lib/node_modules/tsx/node_modules/esbuild/bin/esbuild
+export NODE_PATH=/home/claude/.npm-global/lib/node_modules
+$ESB entry.jsx --bundle --minify --format=iife --jsx=automatic --define:process.env.NODE_ENV='"production"' --outfile=bundle.js --log-level=warning
+mkdir -p site
+node -e '
+const fs=require("fs");
+const css=fs.readFileSync("style.css","utf8");
+const js=fs.readFileSync("bundle.js","utf8").replace(/<\/script/g,"<\\/script");
+const html=`<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>北海道七日自駕遊</title>
+<meta name="description" content="2026 北海道七日自駕遊：行程、航班、清單、住宿、公數袋">
+<meta name="theme-color" content="#FFFCF6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="北海道">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Huninn&display=swap" rel="stylesheet">
+<style>${css}</style>
+</head>
+<body>
+<div id="root"></div>
+<script>${js}</script>
+</body>
+</html>`;
+fs.writeFileSync("site/index.html",html);
+fs.writeFileSync("site/manifest.json",JSON.stringify({name:"北海道七日自駕遊",short_name:"北海道",start_url:".",display:"standalone",background_color:"#FFFCF6",theme_color:"#FFFCF6",icons:[{src:"icon-192.png",sizes:"192x192",type:"image/png"},{src:"icon-512.png",sizes:"512x512",type:"image/png"}]},null,2));
+fs.writeFileSync("site/.nojekyll","");
+const sharp=require("sharp");
+const svg=fs.readFileSync("icon.svg");
+Promise.all([180,192,512].map(s=>sharp(svg).resize(s,s).png().toFile(`site/icon-${s}.png`))).then(()=>console.log("ok",(html.length/1024).toFixed(0)+"KB"));
+'
