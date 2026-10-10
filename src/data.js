@@ -8,7 +8,10 @@ export const TRIP = {
   endDate: "2026-10-16",
 };
 
-export const PEOPLE = ["Gavin", "Athena", "Gionna", "Irene", "Hendy", "PoYan", "Choi"];
+// 解鎖「編輯模式」（改行程、記公數袋）嘅 PIN
+export const EDIT_PIN = "1010";
+
+export const PEOPLE =["Gavin", "Athena", "Gionna", "Irene", "Hendy", "PoYan", "Choi"];
 
 export const GROUPS = [
   { id: "A", name: "A組", members: ["Gavin", "Athena"], color: "#F2A497", dest: "去東京" },

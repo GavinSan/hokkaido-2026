@@ -27,6 +27,7 @@ a { color: inherit; }
 
 .app { max-width: 560px; margin: 0 auto; min-height: 100vh; }
 main { padding: calc(66px + env(safe-area-inset-top)) 16px 48px; }
+main.with-banner { padding-top: calc(96px + env(safe-area-inset-top)); }
 .page { display: flex; flex-direction: column; gap: 14px; }
 
 /* ---------- 頂部固定選單 ---------- */
@@ -38,7 +39,7 @@ main { padding: calc(66px + env(safe-area-inset-top)) 16px 48px; }
 }
 .topnav-inner {
   max-width: 560px; margin: 0 auto; padding: 8px 10px;
-  display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+  display: grid; grid-template-columns: repeat(5, 1fr) 40px; gap: 6px;
 }
 .nav-btn {
   border: var(--line); border-radius: 999px; background: var(--paper);
@@ -271,6 +272,33 @@ main { padding: calc(66px + env(safe-area-inset-top)) 16px 48px; }
 .scuttle { animation: scuttle 1.4s ease-in-out infinite; }
 .tick { animation: tick 10s steps(12) infinite; transform-box: view-box; }
 .coin { animation: float 1.2s ease-in-out infinite; }
+
+/* ---------- 編輯／同步 ---------- */
+.lock-btn { position: relative; border: var(--line); border-radius: 50%; background: var(--paper); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; padding: 0; align-self: center; }
+.lock-btn.on { background: var(--yellow); box-shadow: 2px 2px 0 var(--ink); }
+.sync-dot { position: absolute; right: -3px; top: -3px; width: 13px; height: 13px; border: 2px solid var(--ink); border-radius: 50%; }
+.sync-dot.inline { position: static; display: inline-block; margin-right: 6px; vertical-align: -1px; }
+.sync-line { text-align: center; font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+.edit-banner { position: fixed; left: 0; right: 0; top: calc(59px + env(safe-area-inset-top)); z-index: 49; background: var(--yellow); border-bottom: var(--line); text-align: center; font-size: 13px; font-weight: 700; padding: 3px 0; }
+.edit-btn { border: 2px solid var(--ink); border-radius: 999px; background: var(--yellow); font-weight: 700; font-size: 13.5px; padding: 2px 12px; flex: 0 0 auto; align-self: flex-start; }
+.edit-btn.small { margin-left: auto; }
+.dh-body { flex: 1; min-width: 0; }
+.book-tag.ok { background: var(--green); border-style: solid; }
+.lock-note { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; width: 100%; border-style: dashed; box-shadow: none; }
+.person:disabled { cursor: default; opacity: 1; }
+.danger-btn { color: #C4584A; }
+.sheet-back { position: fixed; inset: 0; z-index: 100; background: rgba(62,58,57,.35); display: flex; align-items: flex-end; justify-content: center; animation: fade .2s ease; }
+.sheet { width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto; border-radius: 26px 26px 0 0; border-bottom: none; padding: 14px 16px calc(20px + env(safe-area-inset-bottom)); box-shadow: none; animation: sheet-up .35s cubic-bezier(.3,1.3,.5,1); }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; }
+.sheet-head h2 { margin: 0; font-size: 20px; }
+.form { display: grid; gap: 12px; margin-top: 8px; }
+.form-row { display: flex; gap: 8px; }
+.fld { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.fld > span { font-size: 13px; font-weight: 700; color: var(--muted); }
+.fld.narrow { flex: 0 0 120px; }
+textarea.input { resize: vertical; }
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes fade { from { opacity: 0; } }
 
 /* 「減少動態效果」：全部停晒 */
 @media (prefers-reduced-motion: reduce) {
