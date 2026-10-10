@@ -47,17 +47,24 @@ const S = {
   stayName: ["名稱", "Name"], stayAddr: ["地址", "Address"], stayAddrEg: ["日文地址最好，Google Maps 搵得到", "Japanese address works best"],
   stayDates: ["日期", "Dates"], stayWho: ["邊個住", "Who"], noAddr: ["未有地址", "No address yet"],
   // money
-  kittySub: ["7份：A組2份・B組3份・C組2份", "7 shares: A ×2 · B ×3 · C ×2"], collected: ["總收", "In"], spent: ["已用", "Spent"], left: ["剩餘", "Left"],
-  approx: ["剩餘約 {x}・每份已用 {y}", "≈ {x} left · {y} spent per share"], short: ["・公數袋唔夠錢，要加一輪", " · Not enough — top up"],
+  kittySub: ["按份數攤分：A組2份・B組3份・C組2份", "Split by shares: A ×2 · B ×3 · C ×2"], collected: ["總收", "In"], spent: ["已用", "Spent"], left: ["剩餘", "Left"],
+  approx: ["剩餘約 {x}・每份已用 {y}", "≈ {x} left · {y} spent per share"], short: ["公數袋現金唔夠，要加錢", "Kitty is short — add cash"],
   addExp: ["記一筆支出", "Log a payment"], amount: ["¥ 金額", "¥ Amount"], item: ["項目（可唔填）", "What (optional)"], logIt: ["記低", "Save"], logged: ["已記低 {x}", "Saved {x}"],
   unlockToLog: ["要記數？撳呢度入 PIN 解鎖", "Need to log? Tap to unlock"], rounds: ["夾錢紀錄", "Contributions"], roundN: ["第 {n} 輪・每人", "Round {n} · each"],
   gotN: ["已收 {a}/{b}", "{a}/{b} paid"], roundTotal: ["呢輪收咗 {x}", "This round: {x}"], allPaid: ["全部已俾", "All paid"], delRound: ["刪除呢一輪夾錢？", "Delete this round?"],
   topUp: ["＋ 再夾一輪", "＋ New round"], settle: ["各組結算", "Settle up by group"], grp: ["組", "Grp"], shares: ["份", "Shr"], put: ["已夾", "Paid in"], owe: ["應分", "Share"], bal: ["結餘", "Balance"],
-  refund: ["退", "Refund "], topup: ["補", "Owe "], settleHint: ["應分＝已用 ÷ 7 × 份數。「退」＝完咗旅程退返俾嗰組。", "Share = spent ÷ 7 × shares. “Refund” = paid back to that group at the end."],
+  refund: ["退", "Refund "], topup: ["補", "Owe "], settleHint: ["結餘＝現金＋碌卡－應分。正數＝應收返錢，負數＝要補錢。", "Balance = cash + card − share. Positive = gets money back, negative = owes."],
   expenses: ["支出紀錄（{n}）", "Payments ({n})"], noExp: ["未有支出", "No payments yet"], delExp: ["刪除「{x}」？", "Delete “{x}”?"],
   shareBackup: ["分享＋備份", "Share & backup"], copySum: ["複製總結去 WhatsApp", "Copy summary for WhatsApp"], copiedWA: ["已複製，可以貼落 WhatsApp", "Copied — paste into WhatsApp"],
   exportB: ["匯出備份", "Export"], importB: ["匯入備份", "Import"], importQ: ["用呢個檔覆蓋雲端公數袋紀錄？全部人都會見到。", "Replace the shared kitty with this file? Everyone will see it."],
   imported: ["已匯入", "Imported"], badFile: ["檔案格式唔啱", "Invalid file"], rate: ["匯率 1 日元 =", "Rate: ¥1 ="], hkd: ["港元", "HKD"],
+  share: ["分享", "Share"], shareDay: ["分享成日", "Share day"], addrOpt: ["地址（可唔填，分享時會顯示）", "Address (optional, shown when sharing)"], category: ["分類", "Category"],
+  cashLeft: ["公數袋現金剩", "Cash left in kitty"], cashIn: ["夾咗現金", "Cash in"], byCash: ["現金支出", "Paid by cash"], byCard: ["碌卡支出", "Paid by card"], spentAll: ["總支出", "Total spent"],
+  whoPaid: ["邊個俾", "Who paid"], kittyCash: ["公數袋現金", "Kitty cash"], cardOf: ["{g}碌卡", "{g} card"], splitAmong: ["邊幾組分（唔係全部人就揀返）", "Split between"],
+  onlyFor: ["只{g}分", "{g} only"], cashInTitle: ["每組夾咗幾多現金", "Cash put in by each group"], addCash: ["＋ 加現金", "＋ Add cash"], addCashFor: ["{g}加現金", "{g}: add cash"],
+  cashAmt: ["金額（日元）", "Amount (¥)"], cashNoteEg: ["例如：第二次夾", "e.g. top-up"], cashInS: ["現金", "Cash"], cardS: ["碌卡", "Card"], oweS: ["應分", "Share"],
+  getBack: ["應收", "gets back"], payMore: ["要補", "owes"], howSettle: ["點樣找數", "How to settle"], allEven: ["而家啱啱好，唔使找", "All square — nothing to settle"],
+  settleNow: ["按而家條數計；旅程完咗先跟住做。", "Based on current numbers — do this at the end of the trip."],
   c_food: ["食", "Food"], c_car: ["油／泊車", "Fuel/Parking"], c_ticket: ["門票", "Tickets"], c_transport: ["交通", "Transport"], c_super: ["超市", "Groceries"], c_other: ["其他", "Other"],
 };
 
@@ -146,7 +153,7 @@ export const EN_TODO = {
   "厚外套（札幌10月約 8–17°C）": "Warm jacket (Sapporo Oct ~8–17°C)",
   "叉電線、尿袋": "Chargers, power bank",
 };
-export const EN_CAT = { 訂位: "Bookings", 租車: "Car", 證件: "Documents", 錢: "Money", 行李: "Packing", 其他: "Other" };
+export const EN_CAT = { 訂位: "Bookings", 租車: "Car", 證件: "Documents", 錢: "Money", 行李: "Packing", 買嘢: "Shopping", 其他: "Other" };
 
 // 將英文加落預設行程（新開數據庫用）
 export function withEn(days) {

@@ -5,7 +5,7 @@ import { createStore } from "./store.js";
 import { LangCtx, useLang, useT, tr, pick, WEEK_EN, EN_DAYS, EN_STOPS, EN_TODO, EN_CAT, withEn } from "./i18n.js";
 
 const store = createStore();
-const SCHEMA_V = 3;
+const SCHEMA_V = 4;
 
 /* ---------------- 小工具 ---------------- */
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -31,6 +31,7 @@ function useShared(path) {
   return v;
 }
 
+const waUrl = (text) => "https://wa.me/?text=" + encodeURIComponent(text);
 const mapsUrl = (q) => "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q);
 const navUrl = (q) => "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + encodeURIComponent(q);
 
@@ -49,6 +50,23 @@ const MOVE = {
   taxi: { k: "m_taxi", bg: "#F6D27A" },
 };
 const groupOf = (id) => GROUPS.find((g) => g.id === id);
+
+// WhatsApp 分享文字：名、地址、Google Maps
+function stopText(lang, s) {
+  const lines = [`${s.t} ${pick(lang, s, "name")}`];
+  if (s.addr) lines.push(`📍 ${s.addr}`);
+  lines.push(`🗺 ${mapsUrl(s.q || s.addr || s.name)}`);
+  return lines.join("\n");
+}
+function dayText(lang, day, idx) {
+  const w = lang === "en" ? WEEK_EN[day.w] || day.w : day.w;
+  const head = `🍁 *Day ${idx + 1}・${day.d}（${w}）${pick(lang, day, "title")}*`;
+  const stops = sortStops(asArray(day.stops)).map((s) => {
+    const g = s.group ? "【" + s.group.split("").map((id) => pick(lang, groupOf(id), "name")).join("、") + "】" : "";
+    return g + stopText(lang, s);
+  });
+  return [head, "", stops.join("\n\n")].join("\n");
+}
 const weekday = (lang, w) => (lang === "en" ? WEEK_EN[w] || w : w);
 
 /* ---------------- 首次開／升級：寫入預設資料 ---------------- */
@@ -57,6 +75,7 @@ function useSeedAndMigrate() {
   const days = useShared("trip/days");
   const todo = useShared("trip/todo");
   const stays = useShared("trip/stays");
+  const kitty = useShared("trip/kitty");
   const done = useRef(false);
 
   useEffect(() => {
@@ -68,14 +87,13 @@ function useSeedAndMigrate() {
       done.current = true;
       const map = { "trip/meta": { seeded: now, v: SCHEMA_V }, "trip/days": withEn(DAYS), "trip/kitty/rate": 0.052, "trip/stays": STAYS_SEED };
       TODO_SEED.forEach((t, i) => { map[`trip/todo/t${i}`] = { text: t.text, en: EN_TODO[t.text] || null, cat: t.cat, done: false, ts: now + i }; });
-      map["trip/kitty/rounds/r1"] = { amount: 30000, paid: {}, ts: now };
       store.update(map);
       return;
     }
 
     // 舊版數據：加英文、加住宿
     if ((meta.v || 0) < SCHEMA_V) {
-      if (days === undefined || todo === undefined || stays === undefined) return;
+      if (days === undefined || todo === undefined || stays === undefined || kitty === undefined) return;
       done.current = true;
       const map = { "trip/meta/v": SCHEMA_V };
       asArray(days).forEach((d, di) => {
@@ -86,15 +104,22 @@ function useSeedAndMigrate() {
       });
       Object.entries(todo || {}).forEach(([id, it]) => { if (!it.en && EN_TODO[it.text]) map[`trip/todo/${id}/en`] = EN_TODO[it.text]; });
       if (!stays) map["trip/stays"] = STAYS_SEED;
+      // 公數袋 v2：舊「每人每輪」轉做「每組夾咗幾多現金」
+      if (kitty && !kitty.cash && kitty.rounds) {
+        GROUPS.forEach((g) => {
+          const sum = Object.values(kitty.rounds).reduce((acc, r) => acc + g.members.filter((m) => r.paid && r.paid[m]).length * (Number(r.amount) || 0), 0);
+          if (sum > 0) map[`trip/kitty/cash/old${g.id}`] = { g: g.id, amt: sum, note: "舊紀錄轉入", ts: now };
+        });
+      }
       store.update(map);
     } else {
       done.current = true;
     }
-  }, [meta, days, todo, stays]);
+  }, [meta, days, todo, stays, kitty]);
 }
 
 /* ---------------- 頂部固定選單 ---------------- */
-const TABS = ["home", "plan", "todo", "stay", "money"];
+const TABS = ["home", "plan", "stay", "money", "todo"];
 const STATUS_C = { online: "#6DB35A", connecting: "#F6D27A", offline: "#F2A497", error: "#C4584A", local: "#BDB6B2" };
 
 function TopNav({ tab, setTab, editing, toggleEdit, status }) {
@@ -367,15 +392,16 @@ function Timeline({ stops, editing, showGroup, onEdit, onReorder }) {
               {dish ? <div className="tl-dish">{t("mustEat")}{dish}</div> : null}
               {note ? <div className="tl-note">{note}</div> : null}
               <div className="tl-links">
-                <a href={mapsUrl(s.q || s.name)} target="_blank" rel="noreferrer">{t("map")}</a>
-                <a href={navUrl(s.q || s.name)} target="_blank" rel="noreferrer" className="go">{t("nav")}</a>
+                <a href={mapsUrl(s.q || s.addr || s.name)} target="_blank" rel="noreferrer">{t("map")}</a>
+                <a href={navUrl(s.q || s.addr || s.name)} target="_blank" rel="noreferrer" className="go">{t("nav")}</a>
+                <a href={waUrl(stopText(lang, s))} target="_blank" rel="noreferrer" className="wa">{t("share")}</a>
                 {editing ? <button className="edit-btn small" onClick={() => onEdit(s._i)}>{t("edit")}</button> : null}
               </div>
               {editing ? (
-                <button className="drag-handle" aria-label={t("dragHint")}
+                <span className="drag-handle" role="button" tabIndex={-1} aria-label={t("dragHint")}
                   onPointerDown={(e) => start(e, i)} onPointerMove={move} onPointerUp={end} onPointerCancel={end}>
-                  <span /><span /><span />
-                </button>
+                  <svg viewBox="0 0 20 14" width="20" height="14" aria-hidden="true"><path d="M2 2 H18 M2 7 H18 M2 12 H18" stroke="#3E3A39" strokeWidth="2.6" strokeLinecap="round" /></svg>
+                </span>
               ) : null}
             </div>
           </li>
@@ -388,7 +414,7 @@ function Timeline({ stops, editing, showGroup, onEdit, onReorder }) {
 function StopEditor({ stop, dayIdx, days, onSave, onDelete, onClose }) {
   const t = useT();
   const lang = useLang();
-  const [s, setS] = useState(() => ({ t: "12:00", name: "", q: "", must: false, book: false, booked: false, dish: "", note: "", group: "", ...stop, move: stop && stop.move ? { ...stop.move } : null }));
+  const [s, setS] = useState(() => ({ t: "12:00", name: "", q: "", addr: "", must: false, book: false, booked: false, dish: "", note: "", group: "", ...stop, move: stop && stop.move ? { ...stop.move } : null }));
   const [nameEn, setNameEn] = useState(stop && stop.en ? stop.en.name || "" : "");
   const [noteEn, setNoteEn] = useState(stop && stop.en ? stop.en.note || "" : "");
   const [target, setTarget] = useState(dayIdx);
@@ -417,6 +443,7 @@ function StopEditor({ stop, dayIdx, days, onSave, onDelete, onClose }) {
           <label className="fld"><span>{t("place")}</span><input className="input" value={s.name} onChange={(e) => set("name", e.target.value)} placeholder={t("placeEg")} required /></label>
         </div>
         <label className="fld"><span>{t("placeEn")}</span><input className="input" value={nameEn} onChange={(e) => setNameEn(e.target.value)} /></label>
+        <label className="fld"><span>{t("addrOpt")}</span><input className="input" value={s.addr || ""} onChange={(e) => set("addr", e.target.value)} placeholder={t("stayAddrEg")} /></label>
         <label className="fld"><span>{t("mapQ")}</span><input className="input" value={s.q || ""} onChange={(e) => set("q", e.target.value)} placeholder={t("mapQEg")} /></label>
         <div className="fld"><span>{t("whichDay")}</span>
           <div className="chips">
@@ -579,7 +606,10 @@ function Plan({ days, day, setDay, editing }) {
             <div className="dh-title">{pick(lang, data, "title")}</div>
             {pick(lang, data, "intro") ? <div className="dh-intro">{pick(lang, data, "intro")}</div> : null}
           </div>
-          {editing ? <button className="edit-btn" onClick={() => setEditor("day")}>{t("edit")}</button> : null}
+          <div className="dh-btns">
+            <a className="share-btn" href={waUrl(dayText(lang, data, day))} target="_blank" rel="noreferrer">{t("shareDay")}</a>
+            {editing ? <button className="edit-btn" onClick={() => setEditor("day")}>{t("edit")}</button> : null}
+          </div>
         </div>
         {editing ? <p className="hint center">{t("dragHint")}</p> : null}
 
@@ -618,21 +648,28 @@ function Plan({ days, day, setDay, editing }) {
 }
 
 /* ---------------- 待辦清單 ---------------- */
+const TODO_CATS = [
+  { id: "訂位", color: "#F2A497" }, { id: "租車", color: "#F6D27A" }, { id: "證件", color: "#A8D3E6" },
+  { id: "錢", color: "#B9DAA5" }, { id: "行李", color: "#D8C8EA" }, { id: "買嘢", color: "#F7C9D6" }, { id: "其他", color: "#E6DFD7" },
+];
+const catColor = (c) => (TODO_CATS.find((x) => x.id === c) || TODO_CATS[TODO_CATS.length - 1]).color;
 function Todo() {
   const t = useT();
   const lang = useLang();
   const raw = useShared("trip/todo");
   const items = toList(raw).sort((a, b) => (a.ts || 0) - (b.ts || 0));
   const [text, setText] = useState("");
+  const [newCat, setNewCat] = useState("其他");
   const done = items.filter((i) => i.done).length;
-  const cats = [...new Set(items.map((i) => i.cat || "其他"))];
+  const used = new Set(items.map((i) => i.cat || "其他"));
+  const cats = [...TODO_CATS.map((c) => c.id).filter((c) => used.has(c)), ...[...used].filter((c) => !TODO_CATS.some((x) => x.id === c))];
   const label = (it) => (lang === "en" && it.en ? it.en : it.text);
 
   const add = (e) => {
     e.preventDefault();
     const v = text.trim();
     if (!v) return;
-    store.set(`trip/todo/${uid()}`, { text: v, cat: "其他", done: false, ts: Date.now() });
+    store.set(`trip/todo/${uid()}`, { text: v, cat: newCat, done: false, ts: Date.now() });
     setText("");
   };
 
@@ -647,13 +684,20 @@ function Todo() {
         <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder={t("addItem")} aria-label={t("addItem")} />
         <button className="btn" type="submit">{t("add")}</button>
       </form>
+      <div className="chips cat-pick" role="group" aria-label={t("category")}>
+        {TODO_CATS.map((c) => (
+          <button type="button" key={c.id} className={"chip small" + (newCat === c.id ? " on-cat" : "")} style={newCat === c.id ? { background: c.color } : null} onClick={() => setNewCat(c.id)}>
+            <span className="mini-dot" style={{ background: c.color }} />{lang === "en" ? EN_CAT[c.id] || c.id : c.id}
+          </button>
+        ))}
+      </div>
       {raw === undefined ? <div className="card plain empty">{t("loading")}</div> : null}
       {cats.map((c) => (
         <div key={c}>
-          <h2 className="sec small">{lang === "en" ? EN_CAT[c] || c : c}</h2>
+          <h2 className="cat-head" style={{ background: catColor(c) }}>{lang === "en" ? EN_CAT[c] || c : c}</h2>
           <ul className="todo-list">
             {items.filter((i) => (i.cat || "其他") === c).map((it) => (
-              <li key={it.id} className={"card todo" + (it.done ? " done" : "")}>
+              <li key={it.id} className={"card todo" + (it.done ? " done" : "")} style={{ borderLeftColor: catColor(c) }}>
                 <label className="todo-label">
                   <input type="checkbox" checked={!!it.done} onChange={() => store.set(`trip/todo/${it.id}/done`, !it.done)} />
                   <span className="check" aria-hidden="true" />
@@ -767,9 +811,64 @@ function Stay({ editing }) {
   );
 }
 
-/* ---------------- 公數袋 ---------------- */
+/* ---------------- 公數袋 v2：每組夾現金＋有人碌卡，按份數攤分 ---------------- */
 const CATS = [["食", "c_food"], ["油／泊車", "c_car"], ["門票", "c_ticket"], ["交通", "c_transport"], ["超市", "c_super"], ["其他", "c_other"]];
 const catLabel = (lang, c) => { const f = CATS.find(([zh]) => zh === c); return f ? tr(lang, f[1]) : c; };
+const ALL_SPLIT = GROUPS.map((g) => g.id).join("");
+const sharesOf = (id) => (groupOf(id) ? groupOf(id).members.length : 0);
+
+// 計數：每組應分、已俾、結餘，同埋點樣找數
+function computeKitty(cashList, expenses) {
+  const rows = {};
+  GROUPS.forEach((g) => { rows[g.id] = { g, shares: g.members.length, cash: 0, card: 0, owe: 0 }; });
+  cashList.forEach((c) => { if (rows[c.g]) rows[c.g].cash += Number(c.amt) || 0; });
+  let cashSpent = 0, cardSpent = 0;
+  expenses.forEach((e) => {
+    const amt = Number(e.amt) || 0;
+    const payer = e.payer || "kitty";
+    if (payer === "kitty") cashSpent += amt; else { cardSpent += amt; if (rows[payer]) rows[payer].card += amt; }
+    const split = (e.split || ALL_SPLIT).split("").filter((id) => rows[id]);
+    const tot = split.reduce((s, id) => s + rows[id].shares, 0) || 1;
+    split.forEach((id) => { rows[id].owe += (amt * rows[id].shares) / tot; });
+  });
+  const cashIn = Object.values(rows).reduce((s, r) => s + r.cash, 0);
+  const left = cashIn - cashSpent;
+  const list = Object.values(rows).map((r) => ({ ...r, bal: r.cash + r.card - r.owe }));
+
+  // 找數建議：先由公數袋剩低嘅現金派返，唔夠再組對組轉數
+  const debt = [];
+  const cred = [];
+  if (left > 0.5) debt.push({ who: "kitty", amt: left });
+  list.forEach((r) => { if (r.bal < -0.5) debt.push({ who: r.g.id, amt: -r.bal }); else if (r.bal > 0.5) cred.push({ who: r.g.id, amt: r.bal }); });
+  const moves = [];
+  let i = 0, j = 0;
+  while (i < debt.length && j < cred.length) {
+    const x = Math.min(debt[i].amt, cred[j].amt);
+    if (x >= 1) moves.push({ from: debt[i].who, to: cred[j].who, amt: Math.round(x) });
+    debt[i].amt -= x; cred[j].amt -= x;
+    if (debt[i].amt < 0.5) i += 1;
+    if (cred[j].amt < 0.5) j += 1;
+  }
+  return { rows: list, cashIn, cashSpent, cardSpent, spent: cashSpent + cardSpent, left, moves };
+}
+
+function CashSheet({ g, onSave, onClose }) {
+  const t = useT();
+  const lang = useLang();
+  const [amt, setAmt] = useState("");
+  const [note, setNote] = useState("");
+  return (
+    <Sheet title={t("addCashFor", { g: pick(lang, g, "name") })} onClose={onClose}>
+      <form className="form" onSubmit={(e) => { e.preventDefault(); const n = Number(amt.replace(/\D/g, "")); if (n) onSave(n, note.trim()); }}>
+        <label className="fld"><span>{t("cashAmt")}</span><input className="input big-num" inputMode="numeric" pattern="[0-9]*" value={amt} onChange={(e) => setAmt(e.target.value)} placeholder="¥" autoFocus /></label>
+        <label className="fld"><span>{t("note")}</span><input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("cashNoteEg")} /></label>
+        <button className="btn full" type="submit">{t("save")}</button>
+      </form>
+    </Sheet>
+  );
+}
+
+const whoName = (lang, id) => (id === "kitty" ? tr(lang, "kittyCash") : pick(lang, groupOf(id), "name"));
 
 function Money({ editing, askUnlock }) {
   const t = useT();
@@ -777,59 +876,49 @@ function Money({ editing, askUnlock }) {
   const kitty = useShared("trip/kitty");
   const k = kitty || {};
   const rate = k.rate || 0.052;
-  const rounds = toList(k.rounds).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  const cashList = toList(k.cash).sort((a, b) => (a.ts || 0) - (b.ts || 0));
   const expenses = toList(k.expenses).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  const R = computeKitty(cashList, expenses);
 
   const [amt, setAmt] = useState("");
   const [what, setWhat] = useState("");
   const [cat, setCat] = useState(CATS[0][0]);
   const [day, setDay] = useState(() => Math.max(0, tripDayIndex()));
+  const [payer, setPayer] = useState("kitty");
+  const [split, setSplit] = useState(ALL_SPLIT);
+  const [cashFor, setCashFor] = useState(null);
   const [msg, setMsg] = useState("");
   const [rateDraft, setRateDraft] = useState(null);
   const fileRef = useRef(null);
-
-  const total = PEOPLE.length;
-  const paidBy = (p) => rounds.reduce((sum, r) => sum + (r.paid && r.paid[p] ? Number(r.amount) || 0 : 0), 0);
-  const collected = PEOPLE.reduce((s, p) => s + paidBy(p), 0);
-  const spent = expenses.reduce((s, e) => s + (Number(e.amt) || 0), 0);
-  const left = collected - spent;
-  const perShare = spent / total;
-  const pct = collected ? Math.min(100, (spent / collected) * 100) : 0;
-  const groupRows = GROUPS.map((g) => {
-    const put = g.members.reduce((s, p) => s + paidBy(p), 0);
-    const owe = perShare * g.members.length;
-    return { g, shares: g.members.length, put, owe, bal: put - owe };
-  });
-
-  const flash = (x) => { setMsg(x); setTimeout(() => setMsg(""), 1800); };
   const P = "trip/kitty";
+  const flash = (x) => { setMsg(x); setTimeout(() => setMsg(""), 1800); };
 
+  const toggleSplit = (id) => {
+    const next = split.includes(id) ? split.replace(id, "") : (split + id).split("").sort().join("");
+    if (next) setSplit(next);
+  };
   const addExpense = (e) => {
     e.preventDefault();
     const n = Number(String(amt).replace(/[^\d.]/g, ""));
     if (!n) return;
-    store.set(`${P}/expenses/${uid()}`, { amt: n, what: what.trim() || cat, cat, day, ts: Date.now() });
+    store.set(`${P}/expenses/${uid()}`, { amt: n, what: what.trim() || cat, cat, day, payer, split, ts: Date.now() });
     setAmt(""); setWhat("");
     flash(t("logged", { x: yen(n) }));
   };
-  const addRound = () => {
-    const last = rounds[rounds.length - 1];
-    store.set(`${P}/rounds/${uid()}`, { amount: last ? last.amount : 10000, paid: {}, ts: Date.now() });
-  };
 
-  const summary = () => (lang === "en" ? [
-    "💰 *Hokkaido Kitty*",
-    `In: ${yen(collected)}`, `Spent: ${yen(spent)}`, `Left: ${yen(left)} (≈ ${hkd(left, rate)})`, `Spent per share: ${yen(perShare)}`,
-    "", "*Paid in*", ...PEOPLE.map((p) => `${p}: ${yen(paidBy(p))}`),
-    "", "*By group*",
-    ...groupRows.map((r) => `${pick("en", r.g, "name")} (${r.g.members.join(", ")}) ×${r.shares}: in ${yen(r.put)} / share ${yen(r.owe)} / ${r.bal >= 0 ? "refund" : "owe"} ${yen(Math.abs(r.bal))}`),
-  ] : [
-    "💰 *北海道公數袋*",
-    `總收：${yen(collected)}`, `已用：${yen(spent)}`, `剩餘：${yen(left)}（約 ${hkd(left, rate)}）`, `每份已用：${yen(perShare)}`,
-    "", "*每人夾咗*", ...PEOPLE.map((p) => `${p}：${yen(paidBy(p))}`),
-    "", "*各組結算*（退＝退返，補＝要補）",
-    ...groupRows.map((r) => `${r.g.name}（${r.g.members.join("、")}）${r.shares}份：夾 ${yen(r.put)}／用 ${yen(r.owe)}／${r.bal >= 0 ? "退" : "補"} ${yen(Math.abs(r.bal))}`),
-  ]).join("\n");
+  const summary = () => {
+    const nm = (id) => whoName(lang, id);
+    const L = lang === "en";
+    return [
+      L ? "💰 *Hokkaido Kitty*" : "💰 *北海道公數袋*",
+      `${t("cashLeft")}：${yen(R.left)}（≈ ${hkd(R.left, rate)}）`,
+      `${t("spentAll")}：${yen(R.spent)}（${t("byCash")} ${yen(R.cashSpent)}・${t("byCard")} ${yen(R.cardSpent)}）`,
+      "",
+      L ? "*By group*" : "*各組*",
+      ...R.rows.map((r) => `${pick(lang, r.g, "name")}（${r.shares}${L ? " shares" : "份"}）${t("cashInS")} ${yen(r.cash)}・${t("cardS")} ${yen(r.card)}・${t("oweS")} ${yen(r.owe)}・${r.bal >= 0 ? t("getBack") : t("payMore")} ${yen(Math.abs(r.bal))}`),
+      ...(R.moves.length ? ["", L ? "*To settle*" : "*點樣找數*", ...R.moves.map((m) => `${nm(m.from)} → ${nm(m.to)}：${yen(m.amt)}`)] : []),
+    ].join("\n");
+  };
   const copySummary = async () => {
     try { await navigator.clipboard.writeText(summary()); flash(t("copiedWA")); }
     catch (e) { window.prompt("", summary()); }
@@ -848,9 +937,8 @@ function Money({ editing, askUnlock }) {
     r.onload = () => {
       try {
         const d = JSON.parse(r.result);
-        const toObj = (v) => (Array.isArray(v) ? Object.fromEntries(v.map((x) => [x.id || uid(), x])) : v || {});
-        if (!d.rounds || !d.expenses) throw new Error("bad");
-        if (window.confirm(t("importQ"))) { store.set(P, { rate: d.rate || rate, rounds: toObj(d.rounds), expenses: toObj(d.expenses) }); flash(t("imported")); }
+        if (!d.expenses) throw new Error("bad");
+        if (window.confirm(t("importQ"))) { store.set(P, d); flash(t("imported")); }
       } catch (err) { flash(t("badFile")); }
     };
     r.readAsText(f);
@@ -865,13 +953,18 @@ function Money({ editing, askUnlock }) {
       </div>
 
       <div className="card kitty-sum">
-        <div className="ks-row">
-          <div><div className="ks-l">{t("collected")}</div><div className="ks-v">{yen(collected)}</div></div>
-          <div><div className="ks-l">{t("spent")}</div><div className="ks-v">{yen(spent)}</div></div>
-          <div><div className="ks-l">{t("left")}</div><div className={"ks-v" + (left < 0 ? " neg" : "")}>{yen(left)}</div></div>
+        <div className="ks-big">
+          <div className="ks-l">{t("cashLeft")}</div>
+          <div className={"ks-v big" + (R.left < 0 ? " neg" : "")}>{yen(R.left)}</div>
+          <div className="ks-l">≈ {hkd(R.left, rate)}</div>
         </div>
-        <div className="bar"><div className="bar-fill coral" style={{ width: pct + "%" }} /></div>
-        <div className="ks-foot">{t("approx", { x: hkd(left, rate), y: yen(perShare) })}{left < 0 ? <span className="warn">{t("short")}</span> : null}</div>
+        <div className="ks-row">
+          <div><div className="ks-l">{t("cashIn")}</div><div className="ks-v">{yen(R.cashIn)}</div></div>
+          <div><div className="ks-l">{t("byCash")}</div><div className="ks-v">{yen(R.cashSpent)}</div></div>
+          <div><div className="ks-l">{t("byCard")}</div><div className="ks-v">{yen(R.cardSpent)}</div></div>
+        </div>
+        <div className="bar"><div className="bar-fill coral" style={{ width: (R.cashIn ? Math.min(100, (R.cashSpent / R.cashIn) * 100) : 0) + "%" }} /></div>
+        {R.left < 0 ? <div className="ks-foot warn">{t("short")}</div> : null}
       </div>
 
       {editing ? (
@@ -882,7 +975,26 @@ function Money({ editing, askUnlock }) {
               <input className="input amt" inputMode="numeric" pattern="[0-9]*" placeholder={t("amount")} value={amt} onChange={(e) => setAmt(e.target.value)} aria-label={t("amount")} />
               <input className="input" placeholder={t("item")} value={what} onChange={(e) => setWhat(e.target.value)} aria-label={t("item")} />
             </div>
-            <div className="chips">{CATS.map(([c, key]) => <button type="button" key={c} className={"chip" + (cat === c ? " on" : "")} onClick={() => setCat(c)}>{t(key)}</button>)}</div>
+            <div className="fld"><span>{t("whoPaid")}</span>
+              <div className="chips">
+                <button type="button" className={"chip" + (payer === "kitty" ? " on" : "")} onClick={() => setPayer("kitty")}>{t("kittyCash")}</button>
+                {GROUPS.map((g) => (
+                  <button type="button" key={g.id} className={"chip" + (payer === g.id ? " on" : "")} onClick={() => setPayer(g.id)}>
+                    <span className="mini-dot" style={{ background: g.color }} />{t("cardOf", { g: pick(lang, g, "name") })}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="fld"><span>{t("splitAmong")}</span>
+              <div className="chips">
+                {GROUPS.map((g) => (
+                  <button type="button" key={g.id} className={"chip" + (split.includes(g.id) ? " on" : "")} onClick={() => toggleSplit(g.id)}>
+                    {pick(lang, g, "name")} ×{g.members.length}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="chips">{CATS.map(([c, key]) => <button type="button" key={c} className={"chip small" + (cat === c ? " on" : "")} onClick={() => setCat(c)}>{t(key)}</button>)}</div>
             <div className="chips">{DAYS.map((d, i) => <button type="button" key={d.d} className={"chip small" + (day === i ? " on" : "")} onClick={() => setDay(i)}>D{i + 1}</button>)}</div>
             <button className="btn full" type="submit">{t("logIt")}</button>
             {msg ? <div className="toast" role="status">{msg}</div> : null}
@@ -892,59 +1004,45 @@ function Money({ editing, askUnlock }) {
         <button className="card plain lock-note" onClick={askUnlock}><LockIcon open={false} /> {t("unlockToLog")}</button>
       )}
 
-      <h2 className="sec">{t("rounds")}</h2>
+      <h2 className="sec">{t("cashInTitle")}</h2>
       {kitty === undefined ? <div className="card plain empty">{t("loading")}</div> : null}
-      {rounds.map((r, ri) => {
-        const n = PEOPLE.filter((p) => r.paid && r.paid[p]).length;
-        return (
-          <div key={r.id} className="card plain round">
-            <div className="round-head">
-              <span className="round-title">{t("roundN", { n: ri + 1 })}</span>
-              {editing ? (
-                <input className="input tiny" inputMode="numeric" pattern="[0-9]*" defaultValue={r.amount} key={r.amount}
-                  onBlur={(e) => { const v = Number(e.target.value.replace(/\D/g, "")) || 0; if (v !== r.amount) store.set(`${P}/rounds/${r.id}/amount`, v); }}
-                  aria-label={t("roundN", { n: ri + 1 })} />
-              ) : <b>{yen(r.amount)}</b>}
-              <span className="muted">{t("gotN", { a: n, b: total })}</span>
-            </div>
-            {GROUPS.map((g) => (
-              <div key={g.id} className="round-grp">
+      <div className="cash-grid">
+        {GROUPS.map((g) => {
+          const mine = cashList.filter((c) => c.g === g.id);
+          const sum = mine.reduce((s, c) => s + (Number(c.amt) || 0), 0);
+          return (
+            <div key={g.id} className="card plain cash-card" style={{ "--accent": g.color }}>
+              <div className="cash-head">
                 <span className="grp-dot" style={{ background: g.color }}>{g.id}</span>
-                {g.members.map((p) => {
-                  const on = !!(r.paid && r.paid[p]);
-                  return (
-                    <button key={p} className={"person" + (on ? " paid" : "")} aria-pressed={on} disabled={!editing}
-                      onClick={() => store.set(`${P}/rounds/${r.id}/paid/${p}`, on ? null : true)}>
-                      {on ? "✓ " : ""}{p}
-                    </button>
-                  );
-                })}
+                <span className="cash-who">{g.members.join(lang === "en" ? ", " : "、")}</span>
+                <span className="cash-sum">{yen(sum)}</span>
               </div>
-            ))}
-            <div className="round-foot">
-              <span>{t("roundTotal", { x: yen(n * r.amount) })}</span>
-              {editing ? (
-                <span>
-                  <button className="link-btn" onClick={() => store.set(`${P}/rounds/${r.id}/paid`, Object.fromEntries(PEOPLE.map((p) => [p, true])))}>{t("allPaid")}</button>
-                  {rounds.length > 1 ? <button className="link-btn danger" onClick={() => { if (window.confirm(t("delRound"))) store.remove(`${P}/rounds/${r.id}`); }}>{t("del")}</button> : null}
-                </span>
+              {mine.length ? (
+                <ul className="cash-list">
+                  {mine.map((c) => (
+                    <li key={c.id}>
+                      <span>{yen(c.amt)}{c.note ? <span className="muted">・{c.note}</span> : null}</span>
+                      {editing ? <button className="x small" aria-label={t("del")} onClick={() => { if (window.confirm(t("delExp", { x: yen(c.amt) }))) store.remove(`${P}/cash/${c.id}`); }}>×</button> : null}
+                    </li>
+                  ))}
+                </ul>
               ) : null}
+              {editing ? <button className="link-btn" onClick={() => setCashFor(g)}>{t("addCash")}</button> : null}
             </div>
-          </div>
-        );
-      })}
-      {editing ? <button className="btn full ghost" onClick={addRound}>{t("topUp")}</button> : null}
+          );
+        })}
+      </div>
 
       <h2 className="sec">{t("settle")}</h2>
       <div className="card plain">
         <table className="settle">
-          <thead><tr><th>{t("grp")}</th><th>{t("shares")}</th><th>{t("put")}</th><th>{t("owe")}</th><th>{t("bal")}</th></tr></thead>
+          <thead><tr><th>{t("grp")}</th><th>{t("cashInS")}</th><th>{t("cardS")}</th><th>{t("oweS")}</th><th>{t("bal")}</th></tr></thead>
           <tbody>
-            {groupRows.map((r) => (
+            {R.rows.map((r) => (
               <tr key={r.g.id}>
-                <td><span className="grp-dot" style={{ background: r.g.color }}>{r.g.id}</span></td>
-                <td>{r.shares}</td><td>{yen(r.put)}</td><td>{yen(r.owe)}</td>
-                <td className={r.bal >= 0 ? "pos" : "neg"}>{r.bal >= 0 ? t("refund") : t("topup")}{yen(Math.abs(r.bal))}</td>
+                <td><span className="grp-dot" style={{ background: r.g.color }}>{r.g.id}</span><span className="muted small">×{r.shares}</span></td>
+                <td>{yen(r.cash)}</td><td>{yen(r.card)}</td><td>{yen(r.owe)}</td>
+                <td className={r.bal >= 0 ? "pos" : "neg"}>{r.bal >= 0 ? "+" : "−"}{yen(Math.abs(r.bal))}</td>
               </tr>
             ))}
           </tbody>
@@ -952,17 +1050,45 @@ function Money({ editing, askUnlock }) {
         <div className="hint">{t("settleHint")}</div>
       </div>
 
+      <h2 className="sec">{t("howSettle")}</h2>
+      <div className="card plain">
+        {R.moves.length === 0 ? <div className="empty">{t("allEven")}</div> : (
+          <ul className="moves">
+            {R.moves.map((m, i) => (
+              <li key={i}>
+                <span className="mv-who">{whoName(lang, m.from)}</span>
+                <span className="mv-arrow">→</span>
+                <span className="mv-who">{whoName(lang, m.to)}</span>
+                <span className="mv-amt">{yen(m.amt)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="hint">{t("settleNow")}</div>
+      </div>
+
       <h2 className="sec">{t("expenses", { n: expenses.length })}</h2>
       {kitty !== undefined && expenses.length === 0 ? <div className="card plain empty">{t("noExp")}</div> : null}
       <ul className="exp-list">
-        {expenses.map((e) => (
-          <li key={e.id} className="card exp">
-            <span className="tag" style={{ background: "#FBEAD0" }}>D{(Number(e.day) || 0) + 1}・{catLabel(lang, e.cat)}</span>
-            <span className="exp-what">{e.what === e.cat ? catLabel(lang, e.cat) : e.what}</span>
-            <span className="exp-amt">{yen(e.amt)}</span>
-            {editing ? <button className="x" aria-label={t("del") + " " + e.what} onClick={() => { if (window.confirm(t("delExp", { x: `${e.what} ${yen(e.amt)}` }))) store.remove(`${P}/expenses/${e.id}`); }}>×</button> : null}
-          </li>
-        ))}
+        {expenses.map((e) => {
+          const p = e.payer || "kitty";
+          const g = groupOf(p);
+          const sp = e.split || ALL_SPLIT;
+          return (
+            <li key={e.id} className="card exp">
+              <div className="exp-main">
+                <span className="exp-what">{e.what === e.cat ? catLabel(lang, e.cat) : e.what}</span>
+                <span className="exp-meta">
+                  <span className="tag tiny" style={{ background: "#FBEAD0" }}>D{(Number(e.day) || 0) + 1}・{catLabel(lang, e.cat)}</span>
+                  <span className="tag tiny" style={{ background: g ? g.color : "#F4EFE8" }}>{p === "kitty" ? t("kittyCash") : t("cardOf", { g: pick(lang, g, "name") })}</span>
+                  {sp !== ALL_SPLIT ? <span className="tag tiny ghost-tag">{t("onlyFor", { g: sp.split("").join("+") })}</span> : null}
+                </span>
+              </div>
+              <span className="exp-amt">{yen(e.amt)}</span>
+              {editing ? <button className="x" aria-label={t("del") + " " + e.what} onClick={() => { if (window.confirm(t("delExp", { x: `${e.what} ${yen(e.amt)}` }))) store.remove(`${P}/expenses/${e.id}`); }}>×</button> : null}
+            </li>
+          );
+        })}
       </ul>
 
       <h2 className="sec">{t("shareBackup")}</h2>
@@ -983,6 +1109,8 @@ function Money({ editing, askUnlock }) {
           {t("hkd")}
         </label>
       </div>
+
+      {cashFor ? <CashSheet g={cashFor} onClose={() => setCashFor(null)} onSave={(n, note) => { store.set(`${P}/cash/${uid()}`, { g: cashFor.id, amt: n, note, ts: Date.now() }); setCashFor(null); }} /> : null}
     </div>
   );
 }
