@@ -2,6 +2,7 @@
 
 export const TRIP = {
   title: "北海道七日自駕遊",
+  titleEn: "Hokkaido 7-Day Road Trip",
   sub: "楓葉・海鮮・溫泉",
   departISO: "2026-10-10T08:30:00+08:00", // HX690 香港出發
   startDate: "2026-10-10",
@@ -9,32 +10,32 @@ export const TRIP = {
 };
 
 // 解鎖「編輯模式」（改行程、記公數袋）嘅 PIN
-export const EDIT_PIN = "1010";
+export const EDIT_PIN = "0303";
 
 export const PEOPLE =["Gavin", "Athena", "Gionna", "Irene", "Hendy", "PoYan", "Choi"];
 
 export const GROUPS = [
-  { id: "A", name: "A組", members: ["Gavin", "Athena"], color: "#F2A497", dest: "去東京" },
-  { id: "B", name: "B組", members: ["Gionna", "Irene", "Hendy"], color: "#A8D3E6", dest: "返香港" },
-  { id: "C", name: "C組", members: ["PoYan", "Choi"], color: "#B9DAA5", dest: "多留一晚" },
+  { id: "A", name: "A組", members: ["Gavin", "Athena"], color: "#F2A497", dest: "去東京", en: { name: "Group A", dest: "to Tokyo" } },
+  { id: "B", name: "B組", members: ["Gionna", "Irene", "Hendy"], color: "#A8D3E6", dest: "返香港", en: { name: "Group B", dest: "to Hong Kong" } },
+  { id: "C", name: "C組", members: ["PoYan", "Choi"], color: "#B9DAA5", dest: "多留一晚", en: { name: "Group C", dest: "one more night" } },
 ];
 
 export const FLIGHTS = [
-  { id: "f1", no: "HX690", date: "10/10（六）", from: "HKG", fromName: "香港", dep: "08:30", to: "CTS", toName: "新千歲", arr: "14:55", who: "全部7人", color: "#F6D27A" },
-  { id: "f2", no: "NH50", date: "10/16（五）", from: "CTS", fromName: "新千歲", dep: "07:30", to: "HND", toName: "羽田", arr: "09:05", who: "A組｜Gavin、Athena", color: "#F2A497" },
-  { id: "f3", no: "HX691", date: "10/16（五）", from: "CTS", fromName: "新千歲", dep: "15:55", to: "HKG", toName: "香港", arr: "—", who: "B組｜Gionna、Irene、Hendy", color: "#A8D3E6", note: "13:55 check-in" },
-  { id: "f4", no: "待填", date: "10/17（六）", from: "CTS", fromName: "新千歲", dep: "早機", to: "—", toName: "", arr: "—", who: "C組｜PoYan、Choi", color: "#B9DAA5" },
+  { id: "f1", no: "HX690", date: "10/10（六）", from: "HKG", fromName: "香港", dep: "08:30", to: "CTS", toName: "新千歲", arr: "14:55", who: "全部7人", color: "#F6D27A", en: { date: "Sat 10/10", fromName: "Hong Kong", toName: "New Chitose", who: "All 7" } },
+  { id: "f2", no: "NH50", date: "10/16（五）", from: "CTS", fromName: "新千歲", dep: "07:30", to: "HND", toName: "羽田", arr: "09:05", who: "A組｜Gavin、Athena", color: "#F2A497", en: { date: "Fri 10/16", fromName: "New Chitose", toName: "Haneda", who: "Group A · Gavin, Athena" } },
+  { id: "f3", no: "HX691", date: "10/16（五）", from: "CTS", fromName: "新千歲", dep: "15:55", to: "HKG", toName: "香港", arr: "—", who: "B組｜Gionna、Irene、Hendy", color: "#A8D3E6", note: "13:55 check-in", en: { date: "Fri 10/16", fromName: "New Chitose", toName: "Hong Kong", who: "Group B · Gionna, Irene, Hendy" } },
+  { id: "f4", no: "待填", date: "10/17（六）", from: "CTS", fromName: "新千歲", dep: "早機", to: "—", toName: "", arr: "—", who: "C組｜PoYan、Choi", color: "#B9DAA5", en: { no: "TBC", dep: "Early", date: "Sat 10/17", fromName: "New Chitose", who: "Group C · PoYan, Choi" } },
 ];
 
-export const STAY = {
-  name: "札幌住宿（全程）",
-  addr: "〒062-0901 北海道札幌市豊平区豊平1条7丁目2-7",
-  addrShort: "札幌市豊平区豊平1条7丁目2-7",
-  dates: "10/10（六）入住 → 10/16（五）10:00 退房",
-  near: [
-    { name: "Lawson 豊平1条店", addr: "豊平1条8丁目2-5", note: "最近便利店，行1分鐘" },
-  ],
-  second: { name: "C組第二間酒店", dates: "10/16 → 10/17", note: "PoYan、Choi 自己填地址" },
+export const STAY_NEAR = [
+  { name: "Lawson 豊平1条店", addr: "豊平1条8丁目2-5", note: "最近便利店，行1分鐘", en: { note: "Nearest convenience store, 1 min walk" } },
+];
+// 住宿會寫入 Firebase，之後喺 app 改
+export const STAYS_SEED = {
+  s1: { order: 1, name: "札幌住宿（全程）", addr: "〒062-0901 北海道札幌市豊平区豊平1条7丁目2-7", dates: "10/10 → 10/16 10:00 退房", who: "全部7人",
+        en: { name: "Sapporo apartment (whole trip)", dates: "10/10 → 10/16, check out 10:00", who: "All 7" } },
+  s2: { order: 2, name: "C組第二間酒店", addr: "", dates: "10/16 → 10/17", who: "PoYan、Choi",
+        en: { name: "Group C second hotel", dates: "10/16 → 10/17", who: "PoYan, Choi" } },
 };
 
 // move.t: car 自駕 / walk 步行 / plane 飛機 / taxi 的士
@@ -131,7 +132,7 @@ export const DAYS = [
 ];
 
 export const BACKUP = [
-  { name: "かに王", addr: "白老町竹浦113-13", tel: "0144-87-4575", note: "主要係直銷店，去之前打電話" },
+  { name: "かに王", addr: "白老町竹浦113-13", tel: "0144-87-4575", note: "主要係直銷店，去之前打電話", en: { name: "Kani-O", addr: "Takeura 113-13, Shiraoi", note: "Mainly a direct-sales shop — call first" } },
 ];
 
 export const TODO_SEED = [

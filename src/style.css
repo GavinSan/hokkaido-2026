@@ -295,10 +295,58 @@ main.with-banner { padding-top: calc(96px + env(safe-area-inset-top)); }
 .form-row { display: flex; gap: 8px; }
 .fld { display: grid; gap: 4px; flex: 1; min-width: 0; }
 .fld > span { font-size: 13px; font-weight: 700; color: var(--muted); }
-.fld.narrow { flex: 0 0 120px; }
 textarea.input { resize: vertical; }
 @keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes fade { from { opacity: 0; } }
+
+/* ---------- 時間輸入（iOS 修正） ---------- */
+.input.time { -webkit-appearance: none; appearance: none; min-width: 0; width: 100%; max-width: 100%; display: block; text-align: left; height: 46px; line-height: 1.2; }
+.input.time::-webkit-date-and-time-value { text-align: left; }
+.input.time.big { font-size: 26px; font-weight: 700; height: 60px; text-align: center; }
+.input.time.big::-webkit-date-and-time-value { text-align: center; }
+.fld.narrow { flex: 0 0 116px; }
+.form-row .fld { overflow: hidden; padding: 0 1px 2px; }
+
+/* ---------- 拖拉 ---------- */
+.tl-item { position: relative; transition: transform .2s ease; }
+.timeline.dragging .tl-item { user-select: none; -webkit-user-select: none; }
+.tl-item.lifted .tl-card { box-shadow: 5px 6px 0 var(--ink); background: #FFF6DE; }
+.tl-card { position: relative; }
+.drag-handle {
+  position: absolute; right: 8px; top: 8px; width: 34px; height: 34px; border: 2px solid var(--ink); border-radius: 10px;
+  background: var(--paper); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px;
+  touch-action: none; cursor: grab; padding: 0;
+}
+.drag-handle span { display: block; width: 14px; height: 2.5px; background: var(--ink); border-radius: 2px; }
+.drag-handle:active { cursor: grabbing; background: var(--yellow); }
+.timeline .tl-card .tl-tags, .timeline .tl-card .tl-name { padding-right: 0; }
+.app .tl-card:has(.drag-handle) .tl-tags { padding-right: 40px; min-height: 22px; }
+.hint.center { text-align: center; margin: 8px 0 0; }
+.ask-q { margin: 0; font-size: 16px; font-weight: 700; }
+
+/* ---------- PIN ---------- */
+.pin-dots { display: flex; justify-content: center; gap: 16px; margin: 10px 0 4px; }
+.pin-dot { width: 18px; height: 18px; border: var(--line); border-radius: 50%; background: #fff; transition: background .12s; }
+.pin-dot.on { background: var(--coral); }
+.pin-msg { text-align: center; min-height: 22px; color: #C4584A; font-weight: 700; font-size: 14px; }
+.shake { animation: shake .35s ease; }
+@keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px; }
+.key { border: var(--line); border-radius: 18px; background: var(--paper); font-size: 26px; font-weight: 700; padding: 12px 0; box-shadow: 2px 2px 0 var(--ink); }
+.key:active { transform: translate(2px, 2px); box-shadow: none; background: var(--yellow); }
+.key.fn { font-size: 16px; background: #F4EFE8; }
+
+/* ---------- 語言 ---------- */
+.lang-switch { display: flex; justify-content: center; gap: 0; margin: -4px auto 0; border: var(--line); border-radius: 999px; overflow: hidden; width: max-content; }
+.lang-switch button { border: none; background: var(--paper); padding: 4px 16px; font-weight: 700; font-size: 14px; }
+.lang-switch button + button { border-left: var(--line); }
+.lang-switch button.on { background: var(--mizu); }
+.app.en .nav-btn { font-size: 14px; }
+.app.en .title { font-size: 25px; }
+
+/* ---------- 住宿 ---------- */
+.stay { display: grid; gap: 2px; }
+.stay-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 
 /* 「減少動態效果」：全部停晒 */
 @media (prefers-reduced-motion: reduce) {
