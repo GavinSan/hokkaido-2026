@@ -148,3 +148,42 @@ export const TODO_SEED = [
   { text: "厚外套（札幌10月約 8–17°C）", cat: "行李" },
   { text: "叉電線、尿袋", cat: "行李" },
 ];
+
+/* ===== 設定（會由 Firebase trip/config 覆蓋） ===== */
+TRIP.nDays = 7;
+export const PREF = { h12: false }; // 每部手機自己嘅顯示設定
+export const GROUP_COLORS = ["#F2A497", "#A8D3E6", "#B9DAA5", "#F6D27A", "#D8C8EA", "#F7C9D6"];
+const DEFAULT_GROUPS = GROUPS.map((g) => ({ ...g, members: [...g.members] }));
+export const defaultConfig = () => ({
+  start: TRIP.startDate,
+  nDays: 7,
+  groups: Object.fromEntries(DEFAULT_GROUPS.map((g, i) => [g.id, { name: g.name, en: g.en ? g.en.name : "", dest: g.dest || "", destEn: g.en ? g.en.dest : "", color: g.color, members: g.members, order: i }])),
+});
+// 將雲端設定套用落 TRIP／GROUPS／PEOPLE（原地改，咁其他 import 嘅地方都見到）
+export function applyConfig(cfg) {
+  const c = cfg || defaultConfig();
+  if (c.start) TRIP.startDate = c.start;
+  if (c.nDays) TRIP.nDays = Math.max(1, Math.min(30, Number(c.nDays) || 7));
+  const groups = Object.entries(c.groups || {})
+    .map(([id, g]) => ({ id, name: g.name || id, color: g.color || GROUP_COLORS[0], dest: g.dest || "", members: (Array.isArray(g.members) ? g.members : Object.values(g.members || {})).filter(Boolean), order: g.order || 0,
+      en: { name: g.en || g.name || id, dest: g.destEn || "" } }))
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  if (groups.length) GROUPS.splice(0, GROUPS.length, ...groups);
+  PEOPLE.splice(0, PEOPLE.length, ...GROUPS.flatMap((g) => g.members));
+}
+// 由開始日期計返每日嘅 MM/DD 同星期
+export function dayList() {
+  const out = [];
+  const [y, m, d] = TRIP.startDate.split("-").map(Number);
+  for (let i = 0; i < TRIP.nDays; i += 1) {
+    const dt = new Date(Date.UTC(y, m - 1, d + i));
+    out.push({ d: `${dt.getUTCMonth() + 1}/${String(dt.getUTCDate()).padStart(2, "0")}`, w: "日一二三四五六"[dt.getUTCDay()] });
+  }
+  return out;
+}
+// 時間顯示：24h 或 12h
+export function fmtT(t) {
+  if (!PREF.h12 || !/^\d{1,2}:\d{2}$/.test(String(t))) return t;
+  const [h, m] = String(t).split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")}${h < 12 ? "am" : "pm"}`;
+}

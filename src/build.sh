@@ -15,6 +15,8 @@ const html=`<!DOCTYPE html>
 <title>北海道七日自駕遊</title>
 <meta name="description" content="2026 北海道七日自駕遊：行程、航班、清單、住宿、公數袋">
 <meta name="theme-color" content="#FFFCF6">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="北海道">

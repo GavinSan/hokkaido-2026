@@ -2,6 +2,25 @@
 // 兩種模式都係用 path（例如 "trip/kitty/expenses"）讀寫。
 
 const FB_VER = "10.12.2";
+
+/* ---------- 私人連結：數據放喺 trips/<key>，key 唔喺 GitHub ---------- */
+export const KEY_STORE = "hok-key";
+export function currentKey() {
+  try {
+    const m = window.location.hash.match(/k=([A-Za-z0-9_-]{20,})/);
+    if (m) {
+      localStorage.setItem(KEY_STORE, m[1]);
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+      return m[1];
+    }
+    return localStorage.getItem(KEY_STORE) || "";
+  } catch (e) { return ""; }
+}
+export function newKey() {
+  const a = new Uint8Array(24);
+  crypto.getRandomValues(a);
+  return Array.from(a, (b) => "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 57]).join("");
+}
 const CACHE_KEY = "hok-cache-v1";
 const LOCAL_KEY = "hok-local-tree-v1";
 
@@ -54,17 +73,26 @@ function createLocal() {
     set(path, v) { tree = setAt(tree, path, clean(v)); emit(); return Promise.resolve(); },
     update(map) { Object.entries(map).forEach(([p, v]) => { tree = setAt(tree, p, clean(v)); }); emit(); return Promise.resolve(); },
     remove(path) { tree = setAt(tree, path, null); emit(); return Promise.resolve(); },
+    rawSet(path, v) { tree = setAt(tree, path, clean(v)); emit(); return Promise.resolve(); },
+    once(path) { return Promise.resolve(clean(getAt(tree, path))); },
+    onDenied() { return () => {}; },
+    base: "trip",
     onStatus(cb) { cb("local"); return () => {}; },
   };
 }
 
 /* ---------- Firebase 模式 ---------- */
-function createFirebase(config) {
-  const cache = readJSON(CACHE_KEY, {});
-  const base = `https://www.gstatic.com/firebasejs/${FB_VER}`;
+function createFirebase(config, base) {
+  const P = (path) => (path === "trip" || path.startsWith("trip/") ? base + path.slice(4) : path);
+  const cacheKey = CACHE_KEY + ":" + base;
+  const cache = readJSON(cacheKey, {});
+  const deniedSubs = new Set();
+  let denied = false;
+  const onErr = (err) => { if (String(err && (err.code || err.message)).toLowerCase().includes("permission")) { denied = true; deniedSubs.forEach((f) => f()); } };
+  const cdn = `https://www.gstatic.com/firebasejs/${FB_VER}`;
   const ready = Promise.all([
-    import(/* @vite-ignore */ `${base}/firebase-app.js`),
-    import(/* @vite-ignore */ `${base}/firebase-database.js`),
+    import(/* @vite-ignore */ `${cdn}/firebase-app.js`),
+    import(/* @vite-ignore */ `${cdn}/firebase-database.js`),
   ]).then(([app, dbm]) => {
     const fbApp = app.initializeApp(config);
     return { db: dbm.getDatabase(fbApp), m: dbm };
@@ -81,22 +109,27 @@ function createFirebase(config) {
       let dead = false;
       ready.then(({ db, m }) => {
         if (dead) return;
-        off = m.onValue(m.ref(db, path), (snap) => {
+        off = m.onValue(m.ref(db, P(path)), (snap) => {
           const v = snap.val();
           cache[path] = v;
-          writeJSON(CACHE_KEY, cache);
+          writeJSON(cacheKey, cache);
           cb(v);
-        });
+        }, onErr);
       }).catch(() => { if (!(path in cache)) cb(null); });
       return () => { dead = true; if (off) off(); };
     },
-    set(path, v) { return ready.then(({ db, m }) => m.set(m.ref(db, path), clean(v))); },
+    base,
+    set(path, v) { return ready.then(({ db, m }) => m.set(m.ref(db, P(path)), clean(v))).catch(onErr); },
     update(map) {
       const c = {};
-      Object.entries(map).forEach(([p, v]) => { c[p] = clean(v); });
-      return ready.then(({ db, m }) => m.update(m.ref(db), c));
+      Object.entries(map).forEach(([p, v]) => { c[P(p)] = clean(v); });
+      return ready.then(({ db, m }) => m.update(m.ref(db), c)).catch(onErr);
     },
-    remove(path) { return ready.then(({ db, m }) => m.remove(m.ref(db, path))); },
+    remove(path) { return ready.then(({ db, m }) => m.remove(m.ref(db, P(path)))).catch(onErr); },
+    // 唔經 prefix，用嚟搬去私人路徑
+    rawSet(path, v) { return ready.then(({ db, m }) => m.set(m.ref(db, path), clean(v))); },
+    once(path) { return ready.then(({ db, m }) => m.get(m.ref(db, P(path))).then((s) => s.val())); },
+    onDenied(f) { deniedSubs.add(f); if (denied) f(); return () => deniedSubs.delete(f); },
     onStatus(cb) {
       cb("connecting");
       let off = null;
@@ -110,6 +143,7 @@ function createFirebase(config) {
 
 export function createStore() {
   const cfg = typeof window !== "undefined" ? window.FIREBASE_CONFIG : null;
-  if (cfg && cfg.apiKey && cfg.databaseURL && !String(cfg.apiKey).startsWith("PASTE")) return createFirebase(cfg);
+  const key = typeof window !== "undefined" ? currentKey() : "";
+  if (cfg && cfg.apiKey && cfg.databaseURL && !String(cfg.apiKey).startsWith("PASTE")) return createFirebase(cfg, key ? `trips/${key}` : "trip");
   return createLocal();
 }

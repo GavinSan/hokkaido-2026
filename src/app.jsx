@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { TRIP, PEOPLE, GROUPS, FLIGHTS, STAY_NEAR, STAYS_SEED, DAYS, BACKUP, TODO_SEED, EDIT_PIN } from "./data.js";
+import { TRIP, PEOPLE, GROUPS, FLIGHTS, STAY_NEAR, STAYS_SEED, DAYS, BACKUP, TODO_SEED, EDIT_PIN, PREF, GROUP_COLORS, defaultConfig, applyConfig, dayList, fmtT } from "./data.js";
 import { HeroArt, DayArt, HouseArt, PurseArt, BagArt, PlaneMini } from "./art.jsx";
-import { createStore } from "./store.js";
+import { createStore, newKey, KEY_STORE } from "./store.js";
 import { LangCtx, useLang, useT, tr, pick, WEEK_EN, EN_DAYS, EN_STOPS, EN_TODO, EN_CAT, withEn } from "./i18n.js";
 
 const store = createStore();
@@ -47,7 +47,7 @@ function tripDayIndex(now = jstNow()) {
   const jst = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
   const ymd = `${jst.getFullYear()}-${String(jst.getMonth() + 1).padStart(2, "0")}-${String(jst.getDate()).padStart(2, "0")}`;
   const diff = Math.round((new Date(ymd + "T00:00:00") - new Date(TRIP.startDate + "T00:00:00")) / 86400000);
-  return diff >= 0 && diff < DAYS.length ? diff : -1;
+  return diff >= 0 && diff < TRIP.nDays ? diff : -1;
 }
 
 const MOVE = {
@@ -78,7 +78,7 @@ function fmtMins(lang, n) {
 
 // WhatsApp 分享文字：名、地址、Google Maps
 function stopText(lang, s) {
-  const lines = [`${s.t} ${pick(lang, s, "name")}`];
+  const lines = [`${fmtT(s.t)} ${pick(lang, s, "name")}`];
   if (s.addr) lines.push(`📍 ${s.addr}`);
   lines.push(`🗺 ${mapsUrl(s.q || s.addr || s.name)}`);
   return lines.join("\n");
@@ -145,6 +145,7 @@ function useSeedAndMigrate() {
 
 /* ---------------- 頂部固定選單 ---------------- */
 const TABS = ["home", "plan", "stay", "money", "todo"];
+const GearIcon = () => (<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="3.4" fill="#F6D27A" stroke="#3E3A39" strokeWidth="2.4" /><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M5.5 18.5l2.1-2.1M16.4 7.6l2.1-2.1" stroke="#3E3A39" strokeWidth="2.4" strokeLinecap="round" /></svg>);
 const STATUS_C = { online: "#6DB35A", connecting: "#F6D27A", offline: "#F2A497", error: "#C4584A", local: "#BDB6B2" };
 
 function TopNav({ tab, setTab, editing, toggleEdit, status }) {
@@ -157,6 +158,7 @@ function TopNav({ tab, setTab, editing, toggleEdit, status }) {
             {t(id)}
           </button>
         ))}
+        <button className={"lock-btn gear" + (tab === "settings" ? " on" : "")} onClick={() => setTab("settings")} aria-label={t("settings")}><GearIcon /></button>
         <button className={"lock-btn" + (editing ? " on" : "")} onClick={toggleEdit} aria-label={editing ? t("lockIt") : t("unlock")} title={t("st_" + status)}>
           <LockIcon open={editing} />
           <span className="sync-dot" style={{ background: STATUS_C[status] }} />
@@ -194,18 +196,18 @@ function Sheet({ title, onClose, children }) {
 }
 
 /* ---------------- PIN 數字鍵盤 ---------------- */
-function PinSheet({ onOk, onClose }) {
+function PinSheet({ onOk, onClose, pin: PIN = EDIT_PIN }) {
   const t = useT();
   const [pin, setPin] = useState("");
   const [bad, setBad] = useState(false);
   const press = (k) => {
     if (k === "del") { setPin((p) => p.slice(0, -1)); return; }
     if (k === "clr") { setPin(""); return; }
-    const next = (pin + k).slice(0, EDIT_PIN.length);
+    const next = (pin + k).slice(0, PIN.length);
     setPin(next);
     setBad(false);
-    if (next.length === EDIT_PIN.length) {
-      if (next === EDIT_PIN) setTimeout(onOk, 120);
+    if (next.length === PIN.length) {
+      if (next === PIN) setTimeout(onOk, 120);
       else setTimeout(() => { setBad(true); setPin(""); }, 150);
     }
   };
@@ -217,7 +219,7 @@ function PinSheet({ onOk, onClose }) {
   return (
     <Sheet title={t("pinTitle")} onClose={onClose}>
       <div className={"pin-dots" + (bad ? " shake" : "")} aria-live="polite">
-        {Array.from({ length: EDIT_PIN.length }).map((_, i) => <span key={i} className={"pin-dot" + (i < pin.length ? " on" : "")} />)}
+        {Array.from({ length: PIN.length }).map((_, i) => <span key={i} className={"pin-dot" + (i < pin.length ? " on" : "")} />)}
       </div>
       <div className="pin-msg">{bad ? t("pinWrong") : " "}</div>
       <div className="keypad">
@@ -249,13 +251,13 @@ function NowNext({ nn, days, onOpen }) {
       <button className="nn-row now" onClick={onOpen} disabled={!onOpen}>
         <span className="nn-label"><span className="pulse-dot" />{t("nowDoing")}</span>
         <span className="nn-main">
-          {nn.cur ? <><b>{pick(lang, nn.cur, "name")}</b><small>{nn.cur.t}{gtag(nn.cur)}</small></> : <small>{nn.next ? t("startsAt", { x: nn.next.t }) : ""}</small>}
+          {nn.cur ? <><b>{pick(lang, nn.cur, "name")}</b><small>{fmtT(nn.cur.t)}{gtag(nn.cur)}</small></> : <small>{nn.next ? t("startsAt", { x: fmtT(nn.next.t) }) : ""}</small>}
         </span>
       </button>
       {nn.next ? (
         <div className="nn-row next">
           <span className="nn-label">{t("upNext")}</span>
-          <span className="nn-main"><b>{pick(lang, nn.next, "name")}</b><small>{nn.next.t}・{t("inMin", { x: fmtMins(lang, nn.mins) })}{gtag(nn.next)}</small></span>
+          <span className="nn-main"><b>{pick(lang, nn.next, "name")}</b><small>{fmtT(nn.next.t)}・{t("inMin", { x: fmtMins(lang, nn.mins) })}{gtag(nn.next)}</small></span>
           <a className="nn-go" href={navUrl(nn.next.q || nn.next.addr || nn.next.name)} target="_blank" rel="noreferrer">{t("goNow")}</a>
         </div>
       ) : <div className="nn-row done"><span className="nn-main"><small>{t("dayDone")}</small></span></div>}
@@ -305,9 +307,9 @@ function FlightCard({ f }) {
     <div className="card flight" style={{ "--accent": f.color }}>
       <div className="flight-top"><span className="flight-no">{p("no")}</span><span className="flight-date">{p("date")}</span></div>
       <div className="flight-route">
-        <div className="apt"><div className="apt-code">{f.from}</div><div className="apt-name">{p("fromName")}</div><div className="apt-time">{p("dep")}</div></div>
-        <PlaneMini color={f.color} />
-        <div className="apt right"><div className="apt-code">{f.to}</div><div className="apt-name">{p("toName")}</div><div className="apt-time">{f.arr}</div></div>
+        <div className="apt"><div className="apt-code">{f.from}</div><div className="apt-name">{p("fromName")}</div><div className="apt-time">{fmtT(p("dep"))}</div></div>
+        <div className="fly-path" aria-hidden="true"><span className="fly-plane"><PlaneMini color={f.color} /></span></div>
+        <div className="apt right"><div className="apt-code">{f.to}</div><div className="apt-name">{p("toName")}</div><div className="apt-time">{fmtT(f.arr)}</div></div>
       </div>
       <div className="flight-who">{p("who")}{f.note ? <span className="muted">・{f.note}</span> : null}</div>
     </div>
@@ -323,18 +325,39 @@ function LangSwitch({ lang, setLang }) {
   );
 }
 
-function Home({ goPlan, setTab, days, status, setLang }) {
+function Home({ goPlan, setTab, days, status }) {
   const t = useT();
   const lang = useLang();
+  const now = useNow(30000);
+  const di = tripDayIndex(now);
+  const showDay = di >= 0 ? di : new Date(TRIP.departISO) > now ? 0 : -1;
+  const nn = nowNext(days, now);
+  const today = showDay >= 0 ? days[showDay] : null;
+  const idx = today ? asArray(today.stops).map((s, i) => ({ ...s, _i: i })).sort((a, b) => String(a.t).localeCompare(String(b.t))) : [];
   return (
     <div className="page">
       <div className="hero card"><HeroArt /></div>
-      <div className="title-row">
-        <h1 className="title">{lang === "en" ? TRIP.titleEn : TRIP.title}</h1>
-      </div>
+      <h1 className="title">{lang === "en" ? TRIP.titleEn : TRIP.title}</h1>
       <p className="subtitle">{t("subtitle")}</p>
-      <LangSwitch lang={lang} setLang={setLang} />
-      <Countdown goPlan={goPlan} days={days} />
+      {di < 0 ? <Countdown goPlan={goPlan} days={days} /> : null}
+
+      {today ? (
+        <>
+          <div className="sec-row">
+            <h2 className="sec">{di >= 0 ? t("todayPlan") : t("firstDay")}</h2>
+            <button className="link-btn" onClick={() => goPlan(showDay)}>{t("allDays")}</button>
+          </div>
+          <div className="card day-head slim">
+            <DayArt kind={today.icon} size={48} />
+            <div className="dh-body">
+              <div className="dh-date">Day {showDay + 1}・{today.d}（{weekday(lang, today.w)}）</div>
+              <div className="dh-title">{pick(lang, today, "title")}</div>
+            </div>
+          </div>
+          {di >= 0 ? <NowNext nn={nn} days={days} /> : null}
+          <Timeline stops={idx} editing={false} showGroup onEdit={() => {}} onReorder={() => {}} nowI={di >= 0 && nn && nn.cur ? nn.cur._i : null} nextI={di >= 0 && nn && nn.next ? nn.next._i : null} />
+        </>
+      ) : null}
 
       <h2 className="sec">{t("flights")}</h2>
       <div className="flights">{FLIGHTS.map((f) => <FlightCard key={f.id} f={f} />)}</div>
@@ -342,7 +365,7 @@ function Home({ goPlan, setTab, days, status, setLang }) {
       <h2 className="sec">{t("overview")}</h2>
       <div className="overview">
         {days.map((day, i) => (
-          <button key={day.d} className="card ov-item" onClick={() => goPlan(i)}>
+          <button key={day.d + i} className={"card ov-item" + (i === di ? " today" : "")} onClick={() => goPlan(i)}>
             <DayArt kind={day.icon} size={48} />
             <div><div className="ov-date">{day.d}（{weekday(lang, day.w)}）</div><div className="ov-title">{pick(lang, day, "title")}</div></div>
           </button>
@@ -432,7 +455,7 @@ function Timeline({ stops, editing, showGroup, onEdit, onReorder, nowI, nextI })
         const dish = pick(lang, s, "dish");
         return (
           <li key={s._i + "-" + s.t + s.name} className={"tl-item" + (isDrag ? " lifted" : "") + (s._i === nowI ? " is-now" : "") + (s._i === nextI ? " is-next" : "")} style={style}>
-            <div className="tl-time">{s.t}</div>
+            <div className="tl-time">{fmtT(s.t)}</div>
             <div className="tl-dot" style={{ background: s.must ? "#F6D27A" : "#FFFCF6" }} />
             <div className={"card tl-card" + (s.must ? " must" : "")}>
               <div className="tl-tags">
@@ -550,7 +573,7 @@ function TimeAsk({ ask, onOk, onClose }) {
     <Sheet title={t("newTime")} onClose={onClose}>
       <form className="form" onSubmit={(e) => { e.preventDefault(); onOk(v); }}>
         <p className="ask-q">{t("newTimeQ", { x: pick(lang, ask.stop, "name") })}<br />
-          <span className="muted">{ask.a && ask.b ? t("between", { a: ask.a, b: ask.b }) : ""}</span></p>
+          <span className="muted">{ask.a && ask.b ? t("between", { a: fmtT(ask.a), b: fmtT(ask.b) }) : ""}</span></p>
         <input className="input time big" type="time" value={v} onChange={(e) => setV(e.target.value)} required aria-label={t("time")} />
         <div className="row2">
           <button type="button" className="btn ghost" onClick={onClose}>{t("cancel")}</button>
@@ -885,7 +908,7 @@ function Stay({ editing }) {
 const CATS = [["食", "c_food"], ["油／泊車", "c_car"], ["住宿", "c_stay"], ["門票", "c_ticket"], ["交通", "c_transport"], ["超市", "c_super"], ["其他", "c_other"]];
 const CAT_COLOR = { 食: "#E07A66", "油／泊車": "#4C9FD0", 住宿: "#C76FA6", 門票: "#D9A22E", 交通: "#9878CF", 超市: "#7DB866", 其他: "#857E78" };
 const CUSTOM_COLORS = ["#3E9E92", "#B0835A", "#6C7FD1", "#D46A8C", "#8FA14A"];
-const ALL_SPLIT = GROUPS.map((g) => g.id).join("");
+const allSplit = () => GROUPS.map((g) => g.id).join("");
 const sharesOf = (id) => (groupOf(id) ? groupOf(id).members.length : 0);
 const pctOf = (a, b) => (b ? Math.round((a / b) * 1000) / 10 : 0);
 
@@ -913,7 +936,7 @@ function computeKitty(cashList, expenses) {
     const amt = Number(e.amt) || 0;
     const payer = e.payer || "kitty";
     if (payer === "kitty") cashSpent += amt; else { cardSpent += amt; if (rows[payer]) rows[payer].card += amt; }
-    const split = (e.split || ALL_SPLIT).split("").filter((id) => rows[id]);
+    const split = (e.split || allSplit()).split("").filter((id) => rows[id]);
     const tot = split.reduce((s, id) => s + rows[id].shares, 0) || 1;
     split.forEach((id) => { rows[id].owe += (amt * rows[id].shares) / tot; });
   });
@@ -1044,12 +1067,12 @@ function ExpenseFields({ v, set, cats }) {
       <div className="fld"><span>{t("splitAmong")}</span><SplitPicker value={v.split} onChange={(x) => set("split", x)} /></div>
       <div className="fld"><span>{t("category")}</span><CatPicker value={v.cat} onChange={(x) => set("cat", x)} cats={cats} canAdd /></div>
       <div className="fld"><span>{t("whichDay")}</span>
-        <div className="chips">{DAYS.map((d, i) => <button type="button" key={d.d} className={"chip small" + (v.day === i ? " on" : "")} onClick={() => set("day", i)}>D{i + 1}</button>)}</div>
+        <div className="chips">{dayList().map((d, i) => <button type="button" key={d.d} className={"chip small" + (v.day === i ? " on" : "")} onClick={() => set("day", i)}>D{i + 1}</button>)}</div>
       </div>
     </>
   );
 }
-const blankExpense = () => ({ amt: "", what: "", cat: "食", day: Math.max(0, tripDayIndex()), payer: "kitty", split: ALL_SPLIT });
+const blankExpense = () => ({ amt: "", what: "", cat: "食", day: Math.max(0, tripDayIndex()), payer: "kitty", split: allSplit() });
 function expenseOut(v) {
   const n = Number(String(v.amt).replace(/[^\d]/g, ""));
   if (!n) return null;
@@ -1058,7 +1081,7 @@ function expenseOut(v) {
 
 function ExpenseSheet({ exp, cats, onClose }) {
   const t = useT();
-  const [v, setV] = useState(() => ({ ...blankExpense(), ...exp, amt: String(exp.amt || ""), what: exp.what === exp.cat ? "" : exp.what || "", payer: exp.payer || "kitty", split: exp.split || ALL_SPLIT, day: Number(exp.day) || 0 }));
+  const [v, setV] = useState(() => ({ ...blankExpense(), ...exp, amt: String(exp.amt || ""), what: exp.what === exp.cat ? "" : exp.what || "", payer: exp.payer || "kitty", split: exp.split || allSplit(), day: Number(exp.day) || 0 }));
   const set = (k, x) => setV((o) => ({ ...o, [k]: x }));
   return (
     <Sheet title={t("editExp")} onClose={onClose}>
@@ -1106,7 +1129,7 @@ function SpendChart({ expenses, cats, rate }) {
   const catRows = cats.map((c) => ({ key: c.id, label: catName(lang, cats, c.id), color: c.color, amt: 0 }));
   expenses.forEach((e) => { const r = catRows.find((x) => x.key === e.cat) || catRows[catRows.length - 1]; r.amt += Number(e.amt) || 0; });
   const cr = catRows.filter((r) => r.amt > 0).sort((a, b) => (a.key === "其他") - (b.key === "其他") || b.amt - a.amt);
-  const dayRows = DAYS.map((d, i) => ({ key: i, label: `D${i + 1}・${d.d}`, color: "#4C9FD0", amt: 0 }));
+  const dayRows = dayList().map((d, i) => ({ key: i, label: `D${i + 1}・${d.d}`, color: "#4C9FD0", amt: 0 }));
   expenses.forEach((e) => { const r = dayRows[Number(e.day) || 0]; if (r) r.amt += Number(e.amt) || 0; });
   const rows = by === "cat" ? cr : dayRows;
   const max = Math.max(1, ...rows.map((r) => r.amt));
@@ -1184,15 +1207,19 @@ function ExpenseList({ expenses, editing, cats, rate, onEdit }) {
   let groups;
   if (gb === "all") groups = [{ key: "all", title: null, items: expenses }];
   else if (gb === "day") {
-    groups = DAYS.map((d, i) => ({ key: i, title: `Day ${i + 1}・${d.d}（${weekday(lang, d.w)}）`, items: expenses.filter((e) => (Number(e.day) || 0) === i) }))
+    groups = dayList().map((d, i) => ({ key: i, title: `Day ${i + 1}・${d.d}（${weekday(lang, d.w)}）`, items: expenses.filter((e) => (Number(e.day) || 0) === i) }))
       .filter((g) => g.items.length).reverse();
+  } else if (gb === "payer") {
+    groups = [{ id: "kitty", color: "#F6D27A" }, ...GROUPS.map((g) => ({ id: g.id, color: g.color }))]
+      .map((o) => ({ key: o.id, title: o.id === "kitty" ? t("kittyCash") : t("cardOf", { g: pick(lang, groupOf(o.id), "name") }), color: o.color, items: expenses.filter((e) => (e.payer || "kitty") === o.id) }))
+      .filter((g) => g.items.length);
   } else {
     groups = cats.map((c) => ({ key: c.id, title: catName(lang, cats, c.id), color: c.color, items: expenses.filter((e) => (catInfo(cats, e.cat).id) === c.id) }))
       .filter((g) => g.items.length).sort((a, b) => sum(b.items) - sum(a.items));
   }
   return (
     <div className="exp-wrap">
-      <Seg full label={t("groupBy")} value={gb} onChange={setGb} options={[["day", t("byDay")], ["cat", t("byCat")], ["all", t("all")]]} />
+      <Seg full label={t("groupBy")} value={gb} onChange={setGb} options={[["day", t("byDay")], ["cat", t("byCat")], ["payer", t("byPayer")], ["all", t("all")]]} />
       {expenses.length === 0 ? <div className="card plain empty">{t("noExp")}</div> : null}
       {groups.map((grp) => (
         <div key={grp.key} className="exp-group">
@@ -1206,7 +1233,7 @@ function ExpenseList({ expenses, editing, cats, rate, onEdit }) {
             {grp.items.map((e) => {
               const p = e.payer || "kitty";
               const g = groupOf(p);
-              const sp = e.split || ALL_SPLIT;
+              const sp = e.split || allSplit();
               const ci = catInfo(cats, e.cat);
               const Tag = editing ? "button" : "div";
               return (
@@ -1218,8 +1245,8 @@ function ExpenseList({ expenses, editing, cats, rate, onEdit }) {
                       <span className="exp-meta">
                         {gb !== "day" ? <span className="tag tiny" style={{ background: "#F4EFE8" }}>D{(Number(e.day) || 0) + 1}</span> : null}
                         {gb !== "cat" ? <span className="tag tiny" style={{ background: "#F4EFE8" }}>{catName(lang, cats, e.cat)}</span> : null}
-                        <span className="tag tiny" style={{ background: g ? g.color : "#F6D27A" }}>{p === "kitty" ? t("kittyCash") : t("cardOf", { g: pick(lang, g, "name") })}</span>
-                        {sp !== ALL_SPLIT ? <span className="tag tiny ghost-tag">{t("onlyFor", { g: sp.split("").join("+") })}</span> : null}
+                        {gb === "payer" ? null : <span className="tag tiny" style={{ background: g ? g.color : "#F6D27A" }}>{p === "kitty" ? t("kittyCash") : t("cardOf", { g: pick(lang, g, "name") })}</span>}
+                        {sp !== allSplit() ? <span className="tag tiny ghost-tag">{t("onlyFor", { g: sp.split("").join("+") })}</span> : null}
                       </span>
                     </span>
                     <Yen v={e.amt} rate={rate} cls="exp-amt right" />
@@ -1236,7 +1263,7 @@ function ExpenseList({ expenses, editing, cats, rate, onEdit }) {
   );
 }
 
-function Money({ editing, askUnlock }) {
+function Money({ editing, askUnlock, goSettings }) {
   const t = useT();
   const lang = useLang();
   const kitty = useShared("trip/kitty");
@@ -1401,11 +1428,7 @@ function Money({ editing, askUnlock }) {
       <div className="card plain">
         <button className="btn full" onClick={copySummary}>{t("copySum")}</button>
         {!editing && msg ? <div className="toast" role="status">{msg}</div> : null}
-        <div className="row2">
-          <button className="btn ghost" onClick={exportJson}>{t("exportB")}</button>
-          {editing ? <button className="btn ghost" onClick={() => fileRef.current && fileRef.current.click()}>{t("importB")}</button> : null}
-          <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={importJson} />
-        </div>
+        <button className="btn ghost full mt8" onClick={goSettings}>{t("exportMore")}</button>
         <label className="rate">
           {t("rate")}
           {editing ? (
@@ -1422,6 +1445,328 @@ function Money({ editing, askUnlock }) {
   );
 }
 
+/* ---------------- 設定 ---------------- */
+const DAY_ICONS = ["fireworks", "clock", "canal", "lake", "crab", "onsen", "plane"];
+const PARTS = [["days", "p_days"], ["kitty", "p_kitty"], ["todo", "p_todo"], ["stays", "p_stays"], ["config", "p_config"]];
+
+function download(name, text, type) {
+  const blob = new Blob([text], { type });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+const csvCell = (v) => { const s = String(v == null ? "" : v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+
+function SetCard({ title, children, locked, askUnlock }) {
+  const t = useT();
+  return (
+    <section className="card plain set-card">
+      <h2 className="set-title">{title}</h2>
+      {children}
+      {locked ? <button className="lock-note inline" onClick={askUnlock}><LockIcon open={false} /> {t("unlockToEdit")}</button> : null}
+    </section>
+  );
+}
+
+function GroupsEditor({ cfg, editing }) {
+  const t = useT();
+  const lang = useLang();
+  const fromCfg = () => Object.entries((cfg && cfg.groups) || defaultConfig().groups)
+    .map(([id, g]) => ({ id, name: g.name || id, en: g.en || "", dest: g.dest || "", destEn: g.destEn || "", color: g.color || GROUP_COLORS[0], members: (Array.isArray(g.members) ? g.members : Object.values(g.members || {})).filter(Boolean), order: g.order || 0 }))
+    .sort((a, b) => a.order - b.order);
+  const [draft, setDraft] = useState(fromCfg);
+  const [dirty, setDirty] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => { if (!dirty) setDraft(fromCfg()); }, [cfg]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const upd = (i, patch) => { setDraft(draft.map((g, j) => (j === i ? { ...g, ...patch } : g))); setDirty(true); setErr(""); };
+  const addGroup = () => {
+    const used = new Set(draft.map((g) => g.id));
+    const id = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").find((c) => !used.has(c));
+    if (!id) return;
+    setDraft([...draft, { id, name: `${id}組`, en: `Group ${id}`, dest: "", destEn: "", color: GROUP_COLORS[draft.length % GROUP_COLORS.length], members: [""], order: draft.length }]);
+    setDirty(true);
+  };
+  const save = () => {
+    const names = draft.flatMap((g) => g.members.map((m) => m.trim()).filter(Boolean));
+    if (draft.some((g) => !g.members.some((m) => m.trim()))) { setErr(t("errEmptyGroup")); return; }
+    if (new Set(names).size !== names.length) { setErr(t("errDupName")); return; }
+    const out = {};
+    draft.forEach((g, i) => { out[g.id] = { name: g.name.trim() || g.id, en: g.en.trim(), dest: g.dest, destEn: g.destEn, color: g.color, members: g.members.map((m) => m.trim()).filter(Boolean), order: i }; });
+    store.set("trip/config/groups", out);
+    setDirty(false);
+  };
+  const total = draft.reduce((s, g) => s + g.members.filter((m) => m.trim()).length, 0);
+
+  return (
+    <>
+      <p className="hint">{t("groupsHint", { n: total })}</p>
+      {draft.map((g, i) => (
+        <div key={g.id} className="grp-edit" style={{ "--accent": g.color }}>
+          <div className="ge-head">
+            <span className="grp-dot" style={{ background: g.color }}>{g.id}</span>
+            {editing ? (
+              <>
+                <input className="input" value={g.name} onChange={(e) => upd(i, { name: e.target.value })} aria-label={t("groupName")} />
+                <input className="input" value={g.en} onChange={(e) => upd(i, { en: e.target.value })} placeholder="English" aria-label={t("groupNameEn")} />
+              </>
+            ) : <b>{pick(lang, { name: g.name, en: { name: g.en } }, "name")}</b>}
+            <span className="muted small nowrap">{t("sharesN", { n: g.members.filter((m) => m.trim()).length })}</span>
+          </div>
+          {editing ? (
+            <div className="swatches" role="radiogroup" aria-label={t("color")}>
+              {GROUP_COLORS.map((c) => <button key={c} type="button" role="radio" aria-checked={g.color === c} className={"swatch" + (g.color === c ? " on" : "")} style={{ background: c }} onClick={() => upd(i, { color: c })} aria-label={c} />)}
+            </div>
+          ) : null}
+          <div className="members">
+            {g.members.map((m, j) => (
+              editing ? (
+                <span key={j} className="member-edit">
+                  <input className="input tiny-name" value={m} onChange={(e) => upd(i, { members: g.members.map((x, k) => (k === j ? e.target.value : x)) })} aria-label={t("personName")} placeholder={t("personName")} />
+                  <button type="button" className="x small" aria-label={t("del")} onClick={() => upd(i, { members: g.members.filter((_, k) => k !== j) })}>×</button>
+                </span>
+              ) : <span key={j} className="person paid">{m}</span>
+            ))}
+            {editing ? <button type="button" className="chip small dashed" onClick={() => upd(i, { members: [...g.members, ""] })}>{t("addPerson")}</button> : null}
+          </div>
+          {editing && draft.length > 1 ? (
+            <button type="button" className="link-btn danger" onClick={() => { if (window.confirm(t("delGroupQ", { g: g.name }))) { setDraft(draft.filter((_, k) => k !== i)); setDirty(true); } }}>{t("delGroup")}</button>
+          ) : null}
+        </div>
+      ))}
+      {editing ? (
+        <>
+          <button type="button" className="btn ghost full" onClick={addGroup}>{t("addGroup")}</button>
+          {err ? <div className="warn center">{err}</div> : null}
+          <button type="button" className="btn full" disabled={!dirty} onClick={save}>{dirty ? t("saveGroups") : t("saved")}</button>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function TripDates({ cfg, days, editing }) {
+  const t = useT();
+  const [start, setStart] = useState(TRIP.startDate);
+  const [n, setN] = useState(TRIP.nDays);
+  useEffect(() => { setStart(TRIP.startDate); setN(TRIP.nDays); }, [cfg]);
+  const changed = start !== TRIP.startDate || n !== TRIP.nDays;
+  const apply = () => {
+    const lost = days.slice(n).filter((d) => asArray(d.stops).length).length;
+    if (lost && !window.confirm(t("cutDaysQ", { n: lost }))) return;
+    const old = TRIP.startDate, oldN = TRIP.nDays;
+    TRIP.startDate = start; TRIP.nDays = n;
+    const labels = dayList();
+    TRIP.startDate = old; TRIP.nDays = oldN;
+    const arr = labels.map((lab, i) => ({ ...(days[i] || { title: `Day ${i + 1}`, icon: DAY_ICONS[i % DAY_ICONS.length], stops: [] }), d: lab.d, w: lab.w }));
+    store.update({ "trip/config/start": start, "trip/config/nDays": n, "trip/days": arr });
+  };
+  return (
+    <>
+      <div className="form-row">
+        <label className="fld"><span>{t("startDate")}</span><input className="input" type="date" value={start} disabled={!editing} onChange={(e) => e.target.value && setStart(e.target.value)} /></label>
+        <div className="fld narrow"><span>{t("nDays")}</span>
+          <div className="stepper">
+            <button type="button" disabled={!editing || n <= 1} onClick={() => setN(n - 1)} aria-label="−">−</button>
+            <b>{n}</b>
+            <button type="button" disabled={!editing || n >= 30} onClick={() => setN(n + 1)} aria-label="+">＋</button>
+          </div>
+        </div>
+      </div>
+      {editing && changed ? <button className="btn full" onClick={apply}>{t("applyDates")}</button> : null}
+    </>
+  );
+}
+
+function PinEditor({ editing }) {
+  const t = useT();
+  const [v, setV] = useState("");
+  const [ok, setOk] = useState(false);
+  if (!editing) return <p className="hint">{t("pinHint")}</p>;
+  return (
+    <form className="add-row" onSubmit={(e) => { e.preventDefault(); if (/^\d{4,6}$/.test(v)) { store.set("trip/config/pin", v); setV(""); setOk(true); setTimeout(() => setOk(false), 1800); } }}>
+      <input className="input" type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={v} onChange={(e) => setV(e.target.value.replace(/\D/g, ""))} placeholder={t("newPin")} aria-label={t("newPin")} />
+      <button className="btn" type="submit" disabled={!/^\d{4,6}$/.test(v)}>{ok ? "✓" : t("save")}</button>
+    </form>
+  );
+}
+
+function PrivateLink({ editing }) {
+  const t = useT();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  let key = "";
+  try { key = localStorage.getItem(KEY_STORE) || ""; } catch (e) { /* ignore */ }
+  const isPrivate = String(store.base || "").startsWith("trips/");
+  const link = key ? `${window.location.origin}${window.location.pathname}#k=${key}` : "";
+
+  const create = async () => {
+    if (!window.confirm(t("makeLinkQ"))) return;
+    setBusy(true);
+    try {
+      const data = await store.once("trip");
+      const k = newKey();
+      await store.rawSet(`trips/${k}`, data || {});
+      localStorage.setItem(KEY_STORE, k);
+      window.location.replace(`${window.location.pathname}#k=${k}`);
+      window.location.reload();
+    } catch (e) { setMsg(t("linkFail")); setBusy(false); }
+  };
+  const copy = async () => { try { await navigator.clipboard.writeText(link); setMsg(t("copied")); setTimeout(() => setMsg(""), 1500); } catch (e) { window.prompt("", link); } };
+
+  if (isPrivate) {
+    return (
+      <>
+        <p className="ok-line">🔒 {t("privateOn")}</p>
+        <div className="link-box">{link}</div>
+        <div className="row2">
+          <button className="btn ghost" onClick={copy}>{t("copyLink")}</button>
+          <a className="btn wa-btn" href={"https://wa.me/?text=" + encodeURIComponent(t("linkMsg") + "\n" + link)} target="_blank" rel="noreferrer">WhatsApp</a>
+        </div>
+        {msg ? <div className="toast">{msg}</div> : null}
+        <p className="hint">{t("privateHint")}</p>
+      </>
+    );
+  }
+  return (
+    <>
+      <p className="warn-line">⚠️ {t("publicNow")}</p>
+      {editing ? <button className="btn full" disabled={busy} onClick={create}>{busy ? "…" : t("makeLink")}</button> : null}
+      {msg ? <div className="warn center">{msg}</div> : null}
+    </>
+  );
+}
+
+function ExportBox({ editing }) {
+  const t = useT();
+  const lang = useLang();
+  const all = useShared("trip");
+  const [sel, setSel] = useState(() => Object.fromEntries(PARTS.map(([k]) => [k, true])));
+  const [msg, setMsg] = useState("");
+  const fileRef = useRef(null);
+  const flash = (x) => { setMsg(x); setTimeout(() => setMsg(""), 2000); };
+  const chosen = PARTS.filter(([k]) => sel[k]).map(([k]) => k);
+  const stamp = new Date().toISOString().slice(0, 10);
+
+  const exportJson = () => {
+    const out = { app: "hokkaido-trip", exported: new Date().toISOString() };
+    chosen.forEach((k) => { out[k] = (all || {})[k] || null; });
+    download(`hokkaido-${chosen.length === PARTS.length ? "all" : chosen.join("-")}-${stamp}.json`, JSON.stringify(out, null, 2), "application/json");
+  };
+  const exportCsv = () => {
+    const k = (all && all.kitty) || {};
+    const cats = toList(k.cats);
+    const rows = toList(k.expenses).sort((a, b) => (Number(a.day) || 0) - (Number(b.day) || 0) || (a.ts || 0) - (b.ts || 0));
+    const head = lang === "en" ? ["Day", "Date", "Item", "Category", "Amount (JPY)", "Paid by", "Split between"] : ["日", "日期", "項目", "分類", "金額（日元）", "邊個俾", "邊幾組分"];
+    const dl = dayList();
+    const lines = [head, ...rows.map((e) => {
+      const p = e.payer || "kitty";
+      const catDisp = CATS.find(([zh]) => zh === e.cat) ? tr(lang, CATS.find(([zh]) => zh === e.cat)[1]) : (cats.find((c) => c.name === e.cat) || {}).name || e.cat;
+      return [`D${(Number(e.day) || 0) + 1}`, (dl[Number(e.day) || 0] || {}).d || "", e.what, catDisp, e.amt, whoName(lang, p), (e.split || allSplit()).split("").join("+")];
+    })];
+    download(`hokkaido-expenses-${stamp}.csv`, "﻿" + lines.map((r) => r.map(csvCell).join(",")).join("\n"), "text/csv");
+  };
+  const importJson = (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        let d = JSON.parse(r.result);
+        if (d.expenses && !d.kitty) d = { kitty: d }; // 舊版公數袋備份
+        const parts = chosen.filter((k) => d[k] != null);
+        if (!parts.length) { flash(t("nothingToImport")); return; }
+        if (!window.confirm(t("importPartsQ", { x: parts.map((k) => t(PARTS.find(([p]) => p === k)[1])).join("、") }))) return;
+        const map = {};
+        parts.forEach((k) => { map[`trip/${k}`] = d[k]; });
+        store.update(map);
+        flash(t("imported"));
+      } catch (err) { flash(t("badFile")); }
+    };
+    r.readAsText(f);
+    e.target.value = "";
+  };
+
+  return (
+    <>
+      <div className="chips">
+        {PARTS.map(([k, label]) => (
+          <button key={k} type="button" className={"chip small" + (sel[k] ? " on" : "")} aria-pressed={!!sel[k]} onClick={() => setSel({ ...sel, [k]: !sel[k] })}>{sel[k] ? "✓ " : ""}{t(label)}</button>
+        ))}
+      </div>
+      <div className="row2">
+        <button className="btn" disabled={!chosen.length || !all} onClick={exportJson}>{t("exportJson")}</button>
+        <button className="btn ghost" disabled={!all} onClick={exportCsv}>{t("exportCsv")}</button>
+      </div>
+      {editing ? (
+        <>
+          <button className="btn ghost full mt8" disabled={!chosen.length} onClick={() => fileRef.current && fileRef.current.click()}>{t("importJson")}</button>
+          <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={importJson} />
+        </>
+      ) : null}
+      {msg ? <div className="toast" role="status">{msg}</div> : null}
+      <p className="hint">{t("exportHint")}</p>
+    </>
+  );
+}
+
+function Settings({ editing, askUnlock, lang, setLang, h12, setH12, cfg, days }) {
+  const t = useT();
+  return (
+    <div className="page">
+      <h1 className="title left">{t("settings")}</h1>
+
+      <SetCard title={t("display")}>
+        <div className="set-row"><span>{t("language")}</span><Seg value={lang} onChange={setLang} label={t("language")} options={[["zh", "中文"], ["en", "English"]]} /></div>
+        <div className="set-row"><span>{t("timeFmt")}</span><Seg value={h12 ? "12" : "24"} onChange={(v) => setH12(v === "12")} label={t("timeFmt")} options={[["24", "24h"], ["12", "12h"]]} /></div>
+        <p className="hint">{t("displayHint")}</p>
+      </SetCard>
+
+      <SetCard title={t("tripDates")} locked={!editing} askUnlock={askUnlock}>
+        <TripDates cfg={cfg} days={days} editing={editing} />
+      </SetCard>
+
+      <SetCard title={t("groupsPeople")} locked={!editing} askUnlock={askUnlock}>
+        <GroupsEditor cfg={cfg} editing={editing} />
+      </SetCard>
+
+      <SetCard title={t("security")} locked={!editing} askUnlock={askUnlock}>
+        <PrivateLink editing={editing} />
+        <h3 className="set-sub">{t("pinTitle2")}</h3>
+        <PinEditor editing={editing} />
+      </SetCard>
+
+      <SetCard title={t("exportImport")}>
+        <ExportBox editing={editing} />
+      </SetCard>
+    </div>
+  );
+}
+
+function DeniedScreen() {
+  const t = useT();
+  const [v, setV] = useState("");
+  const go = () => {
+    const m = v.match(/k=([A-Za-z0-9_-]{20,})/) || v.trim().match(/^([A-Za-z0-9_-]{20,})$/);
+    if (!m) return;
+    try { localStorage.setItem(KEY_STORE, m[1]); } catch (e) { /* ignore */ }
+    window.location.reload();
+  };
+  return (
+    <div className="page denied">
+      <div className="hero card"><HeroArt /></div>
+      <h1 className="title">{t("needLink")}</h1>
+      <p className="subtitle">{t("needLinkSub")}</p>
+      <div className="add-row">
+        <input className="input" value={v} onChange={(e) => setV(e.target.value)} placeholder="https://…#k=…" aria-label={t("pasteLink")} />
+        <button className="btn" onClick={go}>OK</button>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- App ---------------- */
 export default function App() {
   const [lang, setLang] = usePersist("hok-lang", "zh");
@@ -1430,6 +1775,12 @@ export default function App() {
   const [editing, setEditing] = usePersist("hok-edit2", false);
   const [pinOpen, setPinOpen] = useState(false);
   const [status, setStatus] = useState(store.mode === "local" ? "local" : "connecting");
+  const [h12, setH12] = usePersist("hok-h12", false);
+  const [denied, setDenied] = useState(false);
+  const cfg = useShared("trip/config");
+  PREF.h12 = h12;
+  applyConfig(cfg || defaultConfig());
+  useEffect(() => store.onDenied(() => setDenied(true)), []);
   const remoteDays = useShared("trip/days");
   const days = asArray(remoteDays).length ? asArray(remoteDays) : withEn(DAYS);
 
@@ -1451,13 +1802,15 @@ export default function App() {
         <TopNav tab={tab} setTab={setTab} editing={editing} toggleEdit={toggleEdit} status={status} />
         {editing ? <div className="edit-banner">{tr(lang, "editBanner")}</div> : null}
         <main className={editing ? "with-banner" : ""}>
-          {tab === "home" && <Home goPlan={goPlan} setTab={setTab} days={days} status={status} setLang={setLang} />}
-          {tab === "plan" && <Plan days={days} day={Math.min(day, days.length - 1)} setDay={setDay} editing={editing} />}
-          {tab === "todo" && <Todo />}
-          {tab === "stay" && <Stay editing={editing} />}
-          {tab === "money" && <Money editing={editing} askUnlock={askUnlock} />}
+          {denied ? <DeniedScreen /> : null}
+          {!denied && tab === "home" && <Home goPlan={goPlan} setTab={setTab} days={days} status={status} />}
+          {!denied && tab === "plan" && <Plan days={days} day={Math.min(day, days.length - 1)} setDay={setDay} editing={editing} />}
+          {!denied && tab === "todo" && <Todo />}
+          {!denied && tab === "stay" && <Stay editing={editing} />}
+          {!denied && tab === "money" && <Money editing={editing} askUnlock={askUnlock} goSettings={() => setTab("settings")} />}
+          {!denied && tab === "settings" && <Settings editing={editing} askUnlock={askUnlock} lang={lang} setLang={setLang} h12={h12} setH12={setH12} cfg={cfg} days={days} />}
         </main>
-        {pinOpen ? <PinSheet onOk={() => { setEditing(true); setPinOpen(false); }} onClose={() => setPinOpen(false)} /> : null}
+        {pinOpen ? <PinSheet pin={(cfg && cfg.pin) || EDIT_PIN} onOk={() => { setEditing(true); setPinOpen(false); }} onClose={() => setPinOpen(false)} /> : null}
       </div>
     </LangCtx.Provider>
   );
