@@ -35,7 +35,15 @@ const waUrl = (text) => "https://wa.me/?text=" + encodeURIComponent(text);
 const mapsUrl = (q) => "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q);
 const navUrl = (q) => "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + encodeURIComponent(q);
 
-function tripDayIndex(now = new Date()) {
+// 而家時間（測試可以用 ?now=2026-10-14T11:30）
+function jstNow() {
+  try {
+    const q = new URLSearchParams(window.location.search).get("now");
+    if (q) { const d = new Date(q + "+09:00"); if (!isNaN(d)) return d; }
+  } catch (e) { /* ignore */ }
+  return new Date();
+}
+function tripDayIndex(now = jstNow()) {
   const jst = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
   const ymd = `${jst.getFullYear()}-${String(jst.getMonth() + 1).padStart(2, "0")}-${String(jst.getDate()).padStart(2, "0")}`;
   const diff = Math.round((new Date(ymd + "T00:00:00") - new Date(TRIP.startDate + "T00:00:00")) / 86400000);
@@ -50,6 +58,23 @@ const MOVE = {
   taxi: { k: "m_taxi", bg: "#F6D27A" },
 };
 const groupOf = (id) => GROUPS.find((g) => g.id === id);
+
+// 今日：而家做緊邊樣、下一站係邊
+function nowNext(days, now) {
+  const di = tripDayIndex(now);
+  if (di < 0 || !days[di]) return null;
+  const jst = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
+  const m = jst.getHours() * 60 + jst.getMinutes();
+  const stops = asArray(days[di].stops).map((s, i) => ({ ...s, _i: i })).sort((a, b) => String(a.t).localeCompare(String(b.t)));
+  let cur = null, next = null;
+  stops.forEach((s) => { if (toMin(s.t) <= m) cur = s; else if (!next) next = s; });
+  return { di, m, cur, next, mins: next ? toMin(next.t) - m : 0 };
+}
+function fmtMins(lang, n) {
+  if (n < 60) return lang === "en" ? `${n} min` : `${n} 分鐘`;
+  const h = Math.floor(n / 60), r = n % 60;
+  return lang === "en" ? `${h}h${r ? " " + r + "m" : ""}` : `${h} 小時${r ? " " + r + " 分" : ""}`;
+}
 
 // WhatsApp 分享文字：名、地址、Google Maps
 function stopText(lang, s) {
@@ -208,9 +233,34 @@ function PinSheet({ onOk, onClose }) {
 
 /* ---------------- 首頁 ---------------- */
 function useNow(ms = 1000) {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => { const id = setInterval(() => setNow(new Date()), ms); return () => clearInterval(id); }, [ms]);
+  const [now, setNow] = useState(() => jstNow());
+  useEffect(() => { const id = setInterval(() => setNow(jstNow()), ms); return () => clearInterval(id); }, [ms]);
   return now;
+}
+
+function NowNext({ nn, days, onOpen }) {
+  const t = useT();
+  const lang = useLang();
+  if (!nn) return null;
+  const gtag = (s) => (s && s.group ? " · " + s.group.split("").map((id) => pick(lang, groupOf(id), "name")).join("/") : "");
+  return (
+    <div className="card nownext">
+      <div className="nn-day">{t("dayN", { n: nn.di + 1 })}・{pick(lang, days[nn.di], "title")}</div>
+      <button className="nn-row now" onClick={onOpen} disabled={!onOpen}>
+        <span className="nn-label"><span className="pulse-dot" />{t("nowDoing")}</span>
+        <span className="nn-main">
+          {nn.cur ? <><b>{pick(lang, nn.cur, "name")}</b><small>{nn.cur.t}{gtag(nn.cur)}</small></> : <small>{nn.next ? t("startsAt", { x: nn.next.t }) : ""}</small>}
+        </span>
+      </button>
+      {nn.next ? (
+        <div className="nn-row next">
+          <span className="nn-label">{t("upNext")}</span>
+          <span className="nn-main"><b>{pick(lang, nn.next, "name")}</b><small>{nn.next.t}・{t("inMin", { x: fmtMins(lang, nn.mins) })}{gtag(nn.next)}</small></span>
+          <a className="nn-go" href={navUrl(nn.next.q || nn.next.addr || nn.next.name)} target="_blank" rel="noreferrer">{t("goNow")}</a>
+        </div>
+      ) : <div className="nn-row done"><span className="nn-main"><small>{t("dayDone")}</small></span></div>}
+    </div>
+  );
 }
 
 function Countdown({ goPlan, days }) {
@@ -234,6 +284,9 @@ function Countdown({ goPlan, days }) {
     );
   }
   if (di >= 0) {
+    return <NowNext nn={nowNext(days, now)} days={days} onOpen={() => goPlan(di)} />;
+  }
+  if (false) {
     return (
       <button className="card countdown today" onClick={() => goPlan(di)}>
         <div className="cd-label">{t("onTrip")}</div>
@@ -326,7 +379,7 @@ function GroupTag({ g }) {
 }
 
 // 可以拖嘅時間軸（用 pointer events，iPhone 都得）
-function Timeline({ stops, editing, showGroup, onEdit, onReorder }) {
+function Timeline({ stops, editing, showGroup, onEdit, onReorder, nowI, nextI }) {
   const t = useT();
   const lang = useLang();
   const listRef = useRef(null);
@@ -378,11 +431,13 @@ function Timeline({ stops, editing, showGroup, onEdit, onReorder }) {
         const note = pick(lang, s, "note");
         const dish = pick(lang, s, "dish");
         return (
-          <li key={s._i + "-" + s.t + s.name} className={"tl-item" + (isDrag ? " lifted" : "")} style={style}>
+          <li key={s._i + "-" + s.t + s.name} className={"tl-item" + (isDrag ? " lifted" : "") + (s._i === nowI ? " is-now" : "") + (s._i === nextI ? " is-next" : "")} style={style}>
             <div className="tl-time">{s.t}</div>
             <div className="tl-dot" style={{ background: s.must ? "#F6D27A" : "#FFFCF6" }} />
             <div className={"card tl-card" + (s.must ? " must" : "")}>
               <div className="tl-tags">
+                {s._i === nowI ? <span className="tag now-tag"><span className="pulse-dot" />{t("nowDoing")}</span> : null}
+                {s._i === nextI ? <span className="tag next-tag">{t("upNext")}</span> : null}
                 <MoveTag move={s.move} />
                 {s.must ? <span className="tag must-tag">{t("must")}</span> : null}
                 {s.book ? <span className={"tag book-tag" + (s.booked ? " ok" : "")}>{s.booked ? t("booked") : t("needBook")}</span> : null}
@@ -532,6 +587,19 @@ function Plan({ days, day, setDay, editing }) {
   const railRef = useRef(null);
   const [editor, setEditor] = useState(null); // {idx} | "day"
   const [ask, setAsk] = useState(null);
+  const now = useNow(30000);
+  const nn = nowNext(days, now);
+  const isToday = nn && nn.di === day;
+  const nowI = isToday && nn.cur ? nn.cur._i : null;
+  const nextI = isToday && nn.next ? nn.next._i : null;
+  useEffect(() => {
+    if (!isToday) return;
+    const id = setTimeout(() => {
+      const el = document.querySelector(".tl-item.is-now") || document.querySelector(".tl-item.is-next");
+      if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 650);
+    return () => clearTimeout(id);
+  }, [day]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const rail = railRef.current;
@@ -611,12 +679,13 @@ function Plan({ days, day, setDay, editing }) {
             {editing ? <button className="edit-btn" onClick={() => setEditor("day")}>{t("edit")}</button> : null}
           </div>
         </div>
+        {isToday ? <NowNext nn={nn} days={days} /> : null}
         {editing ? <p className="hint center">{t("dragHint")}</p> : null}
 
         {sections.map((sec) => (
           <div key={sec.key} className="tl-section">
             {sec.g ? <div className="grp-head" style={{ background: sec.g.color }}>{pick(lang, sec.g, "name")}・{sec.g.members.join(lang === "en" ? ", " : "、")}・{pick(lang, sec.g, "dest")}</div> : null}
-            <Timeline stops={sec.stops} editing={editing} showGroup={sec.key === "all"} onEdit={(idx) => setEditor({ idx })} onReorder={onReorder(sec.stops)} />
+            <Timeline stops={sec.stops} editing={editing} showGroup={sec.key === "all"} onEdit={(idx) => setEditor({ idx })} onReorder={onReorder(sec.stops)} nowI={nowI} nextI={nextI} />
           </div>
         ))}
         {editing ? <button className="btn full ghost" onClick={() => setEditor({ idx: null })}>{t("addStop")}</button> : null}
@@ -870,6 +939,197 @@ function CashSheet({ g, onSave, onClose }) {
 
 const whoName = (lang, id) => (id === "kitty" ? tr(lang, "kittyCash") : pick(lang, groupOf(id), "name"));
 
+// 分類顏色（已用 validator 檢查過色弱分辨；「其他」刻意用灰色）
+const CAT_COLOR = { 食: "#E07A66", "油／泊車": "#4C9FD0", 門票: "#D9A22E", 交通: "#9878CF", 超市: "#7DB866", 其他: "#A39C95" };
+const DAY_COLOR = "#4C9FD0";
+const pct = (a, b) => (b ? Math.round((a / b) * 1000) / 10 : 0);
+
+function Seg({ value, options, onChange, label }) {
+  return (
+    <div className="seg" role="group" aria-label={label}>
+      {options.map(([v, txt]) => (
+        <button key={v} type="button" className={value === v ? "on" : ""} aria-pressed={value === v} onClick={() => onChange(v)}>{txt}</button>
+      ))}
+    </div>
+  );
+}
+
+// 支出分佈圖：上面一條堆疊 bar 睇比例，下面逐行 ¥ 同 %
+function SpendChart({ expenses }) {
+  const t = useT();
+  const lang = useLang();
+  const [by, setBy] = usePersist("hok-chart-by", "cat");
+  const total = expenses.reduce((s, e) => s + (Number(e.amt) || 0), 0);
+  const [tip, setTip] = useState(null);
+
+  let rows;
+  if (by === "cat") {
+    rows = CATS.map(([c]) => ({ key: c, label: catLabel(lang, c), color: CAT_COLOR[c], amt: 0 }));
+    expenses.forEach((e) => { const r = rows.find((x) => x.key === e.cat) || rows[rows.length - 1]; r.amt += Number(e.amt) || 0; });
+    rows = rows.filter((r) => r.amt > 0).sort((a, b) => b.amt - a.amt);
+    const other = rows.findIndex((r) => r.key === "其他");
+    if (other >= 0) rows.push(rows.splice(other, 1)[0]);
+  } else {
+    rows = DAYS.map((d, i) => ({ key: i, label: `D${i + 1}・${d.d}`, color: DAY_COLOR, amt: 0 }));
+    expenses.forEach((e) => { const r = rows[Number(e.day) || 0]; if (r) r.amt += Number(e.amt) || 0; });
+  }
+  const max = Math.max(1, ...rows.map((r) => r.amt));
+
+  return (
+    <div className="card plain chart">
+      <div className="chart-top">
+        <div>
+          <div className="ks-l">{t("spentAll")}</div>
+          <div className="chart-total">{yen(total)}</div>
+        </div>
+        <Seg label={t("viewBy")} value={by} onChange={setBy} options={[["cat", t("byCat")], ["day", t("byDay")]]} />
+      </div>
+      {total === 0 ? <div className="empty">{t("noExp")}</div> : (
+        <>
+          {by === "cat" ? (
+            <div className="stack" role="img" aria-label={rows.map((r) => `${r.label} ${pct(r.amt, total)}%`).join(", ")}>
+              {rows.map((r) => (
+                <span key={r.key} className="stack-seg" style={{ flexGrow: r.amt, background: r.color }}
+                  onPointerEnter={() => setTip(r.key)} onPointerLeave={() => setTip(null)} onClick={() => setTip(tip === r.key ? null : r.key)} />
+              ))}
+            </div>
+          ) : null}
+          <ul className="chart-rows">
+            {rows.map((r) => (
+              <li key={r.key} className={tip === r.key ? "hl" : ""} onPointerEnter={() => setTip(r.key)} onPointerLeave={() => setTip(null)}>
+                <span className="cr-label">{by === "cat" ? <span className="key-dot" style={{ background: r.color }} /> : null}{r.label}</span>
+                <span className="cr-track"><span className="cr-fill" style={{ width: `${(r.amt / max) * 100}%`, background: r.color }} /></span>
+                <span className="cr-amt">{yen(r.amt)}</span>
+                <span className="cr-pct">{r.amt ? pct(r.amt, total) + "%" : "–"}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+// 邊個俾：2×2 大格
+function PayerPicker({ value, onChange }) {
+  const t = useT();
+  const lang = useLang();
+  const opts = [{ id: "kitty", title: t("kittyCash"), sub: t("kittyCashSub"), color: "#F6D27A", icon: "¥" }, ...GROUPS.map((g) => ({ id: g.id, title: t("cardOf", { g: pick(lang, g, "name") }), sub: g.members.join(lang === "en" ? ", " : "、"), color: g.color, icon: "💳" }))];
+  return (
+    <div className="payer-grid" role="radiogroup" aria-label={t("whoPaid")}>
+      {opts.map((o) => (
+        <button key={o.id} type="button" role="radio" aria-checked={value === o.id} className={"payer" + (value === o.id ? " on" : "")} style={{ "--accent": o.color }} onClick={() => onChange(o.id)}>
+          <span className="payer-icon">{o.icon}</span>
+          <span className="payer-txt"><b>{o.title}</b><small>{o.sub}</small></span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// 邊幾組分
+function SplitPicker({ value, onToggle }) {
+  const t = useT();
+  const lang = useLang();
+  const tot = value.split("").reduce((s, id) => s + sharesOf(id), 0);
+  return (
+    <div className="split-grid">
+      {GROUPS.map((g) => {
+        const on = value.includes(g.id);
+        return (
+          <button key={g.id} type="button" aria-pressed={on} className={"split" + (on ? " on" : "")} style={{ "--accent": g.color }} onClick={() => onToggle(g.id)}>
+            <span className="split-check">{on ? "✓" : ""}</span>
+            <b>{pick(lang, g, "name")}</b>
+            <small>{on ? `${g.members.length}/${tot}` : t("notIncl")}</small>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// 每組結算卡
+function SettleCards({ R }) {
+  const t = useT();
+  const lang = useLang();
+  return (
+    <div className="settle-cards">
+      {R.rows.map((r) => {
+        const paid = r.cash + r.card;
+        return (
+          <div key={r.g.id} className="card plain settle-card" style={{ "--accent": r.g.color }}>
+            <div className="sc-head">
+              <span className="grp-dot" style={{ background: r.g.color }}>{r.g.id}</span>
+              <span className="cash-who">{r.g.members.join(lang === "en" ? ", " : "、")}</span>
+              <span className="muted small">{t("sharesN", { n: r.shares })}</span>
+            </div>
+            <div className="sc-grid">
+              <div><span className="ks-l">{t("paidTotal")}</span><b>{yen(paid)}</b><small className="muted">{t("cashInS")} {yen(r.cash)} + {t("cardS")} {yen(r.card)}</small></div>
+              <div><span className="ks-l">{t("oweS")}</span><b>{yen(r.owe)}</b></div>
+            </div>
+            <div className={"sc-bal " + (r.bal >= 0 ? "pos" : "neg")}>
+              {r.bal >= 0 ? t("getBack") : t("payMore")} <b>{yen(Math.abs(r.bal))}</b>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// 支出紀錄：全部／按日／按分類
+function ExpenseList({ expenses, editing, onDelete }) {
+  const t = useT();
+  const lang = useLang();
+  const [gb, setGb] = usePersist("hok-exp-group", "day");
+  let groups;
+  if (gb === "all") groups = [{ key: "all", title: null, items: expenses }];
+  else if (gb === "day") {
+    groups = DAYS.map((d, i) => ({ key: i, title: `Day ${i + 1}・${d.d}（${weekday(lang, d.w)}）`, items: expenses.filter((e) => (Number(e.day) || 0) === i) })).filter((g) => g.items.length);
+  } else {
+    groups = CATS.map(([c]) => ({ key: c, title: catLabel(lang, c), color: CAT_COLOR[c], items: expenses.filter((e) => (e.cat || "其他") === c) })).filter((g) => g.items.length)
+      .sort((a, b) => b.items.reduce((s, e) => s + e.amt, 0) - a.items.reduce((s, e) => s + e.amt, 0));
+  }
+  return (
+    <>
+      <Seg label={t("groupBy")} value={gb} onChange={setGb} options={[["day", t("byDay")], ["cat", t("byCat")], ["all", t("all")]]} />
+      {groups.map((grp) => (
+        <div key={grp.key} className="exp-group">
+          {grp.title ? (
+            <div className="exp-ghead">
+              <span>{grp.color ? <span className="key-dot" style={{ background: grp.color }} /> : null}{grp.title}</span>
+              <span className="muted">{grp.items.length}・<b>{yen(grp.items.reduce((s, e) => s + (Number(e.amt) || 0), 0))}</b></span>
+            </div>
+          ) : null}
+          <ul className="exp-list">
+            {grp.items.map((e) => {
+              const p = e.payer || "kitty";
+              const g = groupOf(p);
+              const sp = e.split || ALL_SPLIT;
+              return (
+                <li key={e.id} className="card exp">
+                  <span className="key-dot big" style={{ background: CAT_COLOR[e.cat] || CAT_COLOR["其他"] }} aria-hidden="true" />
+                  <div className="exp-main">
+                    <span className="exp-what">{e.what === e.cat ? catLabel(lang, e.cat) : e.what}</span>
+                    <span className="exp-meta">
+                      {gb !== "day" ? <span className="tag tiny" style={{ background: "#F4EFE8" }}>D{(Number(e.day) || 0) + 1}</span> : null}
+                      {gb !== "cat" ? <span className="tag tiny" style={{ background: "#F4EFE8" }}>{catLabel(lang, e.cat)}</span> : null}
+                      <span className="tag tiny" style={{ background: g ? g.color : "#F6D27A" }}>{p === "kitty" ? t("kittyCash") : t("cardOf", { g: pick(lang, g, "name") })}</span>
+                      {sp !== ALL_SPLIT ? <span className="tag tiny ghost-tag">{t("onlyFor", { g: sp.split("").join("+") })}</span> : null}
+                    </span>
+                  </div>
+                  <span className="exp-amt">{yen(e.amt)}</span>
+                  {editing ? <button className="x" aria-label={t("del") + " " + e.what} onClick={() => onDelete(e)}>×</button> : null}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function Money({ editing, askUnlock }) {
   const t = useT();
   const lang = useLang();
@@ -967,6 +1227,9 @@ function Money({ editing, askUnlock }) {
         {R.left < 0 ? <div className="ks-foot warn">{t("short")}</div> : null}
       </div>
 
+      <h2 className="sec">{t("whereMoney")}</h2>
+      <SpendChart expenses={expenses} />
+
       {editing ? (
         <>
           <h2 className="sec">{t("addExp")}</h2>
@@ -975,27 +1238,10 @@ function Money({ editing, askUnlock }) {
               <input className="input amt" inputMode="numeric" pattern="[0-9]*" placeholder={t("amount")} value={amt} onChange={(e) => setAmt(e.target.value)} aria-label={t("amount")} />
               <input className="input" placeholder={t("item")} value={what} onChange={(e) => setWhat(e.target.value)} aria-label={t("item")} />
             </div>
-            <div className="fld"><span>{t("whoPaid")}</span>
-              <div className="chips">
-                <button type="button" className={"chip" + (payer === "kitty" ? " on" : "")} onClick={() => setPayer("kitty")}>{t("kittyCash")}</button>
-                {GROUPS.map((g) => (
-                  <button type="button" key={g.id} className={"chip" + (payer === g.id ? " on" : "")} onClick={() => setPayer(g.id)}>
-                    <span className="mini-dot" style={{ background: g.color }} />{t("cardOf", { g: pick(lang, g, "name") })}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="fld"><span>{t("splitAmong")}</span>
-              <div className="chips">
-                {GROUPS.map((g) => (
-                  <button type="button" key={g.id} className={"chip" + (split.includes(g.id) ? " on" : "")} onClick={() => toggleSplit(g.id)}>
-                    {pick(lang, g, "name")} ×{g.members.length}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="chips">{CATS.map(([c, key]) => <button type="button" key={c} className={"chip small" + (cat === c ? " on" : "")} onClick={() => setCat(c)}>{t(key)}</button>)}</div>
-            <div className="chips">{DAYS.map((d, i) => <button type="button" key={d.d} className={"chip small" + (day === i ? " on" : "")} onClick={() => setDay(i)}>D{i + 1}</button>)}</div>
+            <div className="fld"><span>{t("whoPaid")}</span><PayerPicker value={payer} onChange={setPayer} /></div>
+            <div className="fld"><span>{t("splitAmong")}</span><SplitPicker value={split} onToggle={toggleSplit} /></div>
+            <div className="fld"><span>{t("category")}</span><div className="chips">{CATS.map(([c, key]) => <button type="button" key={c} className={"chip small" + (cat === c ? " on" : "")} onClick={() => setCat(c)}><span className="key-dot" style={{ background: CAT_COLOR[c] }} />{t(key)}</button>)}</div></div>
+            <div className="fld"><span>{t("whichDay")}</span><div className="chips">{DAYS.map((d, i) => <button type="button" key={d.d} className={"chip small" + (day === i ? " on" : "")} onClick={() => setDay(i)}>D{i + 1}</button>)}</div></div>
             <button className="btn full" type="submit">{t("logIt")}</button>
             {msg ? <div className="toast" role="status">{msg}</div> : null}
           </form>
@@ -1034,21 +1280,8 @@ function Money({ editing, askUnlock }) {
       </div>
 
       <h2 className="sec">{t("settle")}</h2>
-      <div className="card plain">
-        <table className="settle">
-          <thead><tr><th>{t("grp")}</th><th>{t("cashInS")}</th><th>{t("cardS")}</th><th>{t("oweS")}</th><th>{t("bal")}</th></tr></thead>
-          <tbody>
-            {R.rows.map((r) => (
-              <tr key={r.g.id}>
-                <td><span className="grp-dot" style={{ background: r.g.color }}>{r.g.id}</span><span className="muted small">×{r.shares}</span></td>
-                <td>{yen(r.cash)}</td><td>{yen(r.card)}</td><td>{yen(r.owe)}</td>
-                <td className={r.bal >= 0 ? "pos" : "neg"}>{r.bal >= 0 ? "+" : "−"}{yen(Math.abs(r.bal))}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="hint">{t("settleHint")}</div>
-      </div>
+      <SettleCards R={R} />
+      <p className="hint">{t("settleHint")}</p>
 
       <h2 className="sec">{t("howSettle")}</h2>
       <div className="card plain">
@@ -1068,28 +1301,9 @@ function Money({ editing, askUnlock }) {
       </div>
 
       <h2 className="sec">{t("expenses", { n: expenses.length })}</h2>
-      {kitty !== undefined && expenses.length === 0 ? <div className="card plain empty">{t("noExp")}</div> : null}
-      <ul className="exp-list">
-        {expenses.map((e) => {
-          const p = e.payer || "kitty";
-          const g = groupOf(p);
-          const sp = e.split || ALL_SPLIT;
-          return (
-            <li key={e.id} className="card exp">
-              <div className="exp-main">
-                <span className="exp-what">{e.what === e.cat ? catLabel(lang, e.cat) : e.what}</span>
-                <span className="exp-meta">
-                  <span className="tag tiny" style={{ background: "#FBEAD0" }}>D{(Number(e.day) || 0) + 1}・{catLabel(lang, e.cat)}</span>
-                  <span className="tag tiny" style={{ background: g ? g.color : "#F4EFE8" }}>{p === "kitty" ? t("kittyCash") : t("cardOf", { g: pick(lang, g, "name") })}</span>
-                  {sp !== ALL_SPLIT ? <span className="tag tiny ghost-tag">{t("onlyFor", { g: sp.split("").join("+") })}</span> : null}
-                </span>
-              </div>
-              <span className="exp-amt">{yen(e.amt)}</span>
-              {editing ? <button className="x" aria-label={t("del") + " " + e.what} onClick={() => { if (window.confirm(t("delExp", { x: `${e.what} ${yen(e.amt)}` }))) store.remove(`${P}/expenses/${e.id}`); }}>×</button> : null}
-            </li>
-          );
-        })}
-      </ul>
+      {kitty !== undefined && expenses.length === 0 ? <div className="card plain empty">{t("noExp")}</div> : (
+        <ExpenseList expenses={expenses} editing={editing} onDelete={(e) => { if (window.confirm(t("delExp", { x: `${e.what} ${yen(e.amt)}` }))) store.remove(`${P}/expenses/${e.id}`); }} />
+      )}
 
       <h2 className="sec">{t("shareBackup")}</h2>
       <div className="card plain">

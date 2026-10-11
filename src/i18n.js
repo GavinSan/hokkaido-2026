@@ -53,7 +53,7 @@ const S = {
   unlockToLog: ["要記數？撳呢度入 PIN 解鎖", "Need to log? Tap to unlock"], rounds: ["夾錢紀錄", "Contributions"], roundN: ["第 {n} 輪・每人", "Round {n} · each"],
   gotN: ["已收 {a}/{b}", "{a}/{b} paid"], roundTotal: ["呢輪收咗 {x}", "This round: {x}"], allPaid: ["全部已俾", "All paid"], delRound: ["刪除呢一輪夾錢？", "Delete this round?"],
   topUp: ["＋ 再夾一輪", "＋ New round"], settle: ["各組結算", "Settle up by group"], grp: ["組", "Grp"], shares: ["份", "Shr"], put: ["已夾", "Paid in"], owe: ["應分", "Share"], bal: ["結餘", "Balance"],
-  refund: ["退", "Refund "], topup: ["補", "Owe "], settleHint: ["結餘＝現金＋碌卡－應分。正數＝應收返錢，負數＝要補錢。", "Balance = cash + card − share. Positive = gets money back, negative = owes."],
+  refund: ["退", "Refund "], topup: ["補", "Owe "], settleHint: ["應付份額＝每筆支出按份數攤落嗰組嘅總和。俾咗多過份額就應收返，少過就要補。", "Fair share = each payment split by headcount. Paid more than that → gets money back; less → owes."],
   expenses: ["支出紀錄（{n}）", "Payments ({n})"], noExp: ["未有支出", "No payments yet"], delExp: ["刪除「{x}」？", "Delete “{x}”?"],
   shareBackup: ["分享＋備份", "Share & backup"], copySum: ["複製總結去 WhatsApp", "Copy summary for WhatsApp"], copiedWA: ["已複製，可以貼落 WhatsApp", "Copied — paste into WhatsApp"],
   exportB: ["匯出備份", "Export"], importB: ["匯入備份", "Import"], importQ: ["用呢個檔覆蓋雲端公數袋紀錄？全部人都會見到。", "Replace the shared kitty with this file? Everyone will see it."],
@@ -62,9 +62,12 @@ const S = {
   cashLeft: ["公數袋現金剩", "Cash left in kitty"], cashIn: ["夾咗現金", "Cash in"], byCash: ["現金支出", "Paid by cash"], byCard: ["碌卡支出", "Paid by card"], spentAll: ["總支出", "Total spent"],
   whoPaid: ["邊個俾", "Who paid"], kittyCash: ["公數袋現金", "Kitty cash"], cardOf: ["{g}碌卡", "{g} card"], splitAmong: ["邊幾組分（唔係全部人就揀返）", "Split between"],
   onlyFor: ["只{g}分", "{g} only"], cashInTitle: ["每組夾咗幾多現金", "Cash put in by each group"], addCash: ["＋ 加現金", "＋ Add cash"], addCashFor: ["{g}加現金", "{g}: add cash"],
-  cashAmt: ["金額（日元）", "Amount (¥)"], cashNoteEg: ["例如：第二次夾", "e.g. top-up"], cashInS: ["現金", "Cash"], cardS: ["碌卡", "Card"], oweS: ["應分", "Share"],
-  getBack: ["應收", "gets back"], payMore: ["要補", "owes"], howSettle: ["點樣找數", "How to settle"], allEven: ["而家啱啱好，唔使找", "All square — nothing to settle"],
+  cashAmt: ["金額（日元）", "Amount (¥)"], cashNoteEg: ["例如：第二次夾", "e.g. top-up"], cashInS: ["現金", "Cash"], cardS: ["碌卡", "Card"], oweS: ["應付份額", "Fair share"],
+  getBack: ["應收返", "Gets back"], payMore: ["要補", "Owes"], howSettle: ["點樣找數", "How to settle"], allEven: ["而家啱啱好，唔使找", "All square — nothing to settle"],
   settleNow: ["按而家條數計；旅程完咗先跟住做。", "Based on current numbers — do this at the end of the trip."],
+  whereMoney: ["錢用咗去邊", "Where the money went"], viewBy: ["顯示方式", "View by"], byCat: ["分類", "Category"], byDay: ["每日", "Day"], all: ["全部", "All"], groupBy: ["分組", "Group by"],
+  kittyCashSub: ["由公數袋俾", "Paid from the kitty"], notIncl: ["唔包", "Not incl."], sharesN: ["{n}份", "{n} shares"], paidTotal: ["俾咗", "Paid"],
+  nowDoing: ["而家", "Now"], upNext: ["下一站", "Up next"], inMin: ["仲有 {x}", "in {x}"], dayDone: ["今日行程完咗 🌙", "Done for today 🌙"], startsAt: ["{x} 開始", "starts {x}"], goNow: ["導航", "Go"],
   c_food: ["食", "Food"], c_car: ["油／泊車", "Fuel/Parking"], c_ticket: ["門票", "Tickets"], c_transport: ["交通", "Transport"], c_super: ["超市", "Groceries"], c_other: ["其他", "Other"],
 };
 
