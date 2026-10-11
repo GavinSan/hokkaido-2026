@@ -359,9 +359,6 @@ function Home({ goPlan, setTab, days, status }) {
         </>
       ) : null}
 
-      <h2 className="sec">{t("flights")}</h2>
-      <div className="flights">{FLIGHTS.map((f) => <FlightCard key={f.id} f={f} />)}</div>
-
       <h2 className="sec">{t("overview")}</h2>
       <div className="overview">
         {days.map((day, i) => (
@@ -376,7 +373,35 @@ function Home({ goPlan, setTab, days, status }) {
         <button className="btn" onClick={() => setTab("stay")}>{t("stayInfo")}</button>
         <button className="btn yellow" onClick={() => setTab("money")}>{t("kitty")}</button>
       </div>
+      <FlightsDrawer />
       <p className="sync-line"><span className="sync-dot inline" style={{ background: STATUS_C[status] }} />{t("st_" + status)}{status === "online" ? t("everyoneSame") : ""}</p>
+    </div>
+  );
+}
+
+function FlightsDrawer() {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const toggle = () => {
+    setOpen(!open);
+    if (!open) setTimeout(() => { if (ref.current && ref.current.scrollIntoView) ref.current.scrollIntoView({ behavior: "smooth", block: "start" }); }, 80);
+  };
+  return (
+    <div className="flights-drawer" ref={ref}>
+      <button className={"card flights-btn" + (open ? " open" : "")} onClick={toggle} aria-expanded={open}>
+        <span className="fb-sky" aria-hidden="true">
+          <span className="fb-cloud c1" /><span className="fb-cloud c2" />
+          <span className="fb-plane"><PlaneMini color="#F2A497" /></span>
+        </span>
+        <span className="fb-label">{t("flights")}<small>{t("flightsN", { n: FLIGHTS.length })}</small></span>
+        <span className="chev" aria-hidden="true">{open ? "▲" : "▼"}</span>
+      </button>
+      {open ? (
+        <div className="flights drop-in">
+          {FLIGHTS.map((f, i) => <div key={f.id} className="drop-item" style={{ animationDelay: `${i * 70}ms` }}><FlightCard f={f} /></div>)}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1565,9 +1590,9 @@ function TripDates({ cfg, days, editing }) {
   };
   return (
     <>
-      <div className="form-row">
-        <label className="fld"><span>{t("startDate")}</span><input className="input" type="date" value={start} disabled={!editing} onChange={(e) => e.target.value && setStart(e.target.value)} /></label>
-        <div className="fld narrow"><span>{t("nDays")}</span>
+      <div className="date-grid">
+        <label className="fld"><span>{t("startDate")}</span><input className="input date" type="date" value={start} disabled={!editing} onChange={(e) => e.target.value && setStart(e.target.value)} /></label>
+        <div className="fld"><span>{t("nDays")}</span>
           <div className="stepper">
             <button type="button" disabled={!editing || n <= 1} onClick={() => setN(n - 1)} aria-label="−">−</button>
             <b>{n}</b>

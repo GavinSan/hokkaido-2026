@@ -94,6 +94,7 @@ const S = {
   exportImport: ["匯出／匯入", "Export / import"], needLink: ["要用私人連結開", "Open with the private link"],
   needLinkSub: ["呢個 app 嘅資料而家要用私人連結先睇到。請喺 WhatsApp group 撳嗰條連結，或者貼落下面。", "This app's data now needs the private link. Tap it in the WhatsApp group, or paste it below."],
   pasteLink: ["貼上連結", "Paste link"],
+  flightsN: ["{n} 班機・撳開睇", "{n} flights · tap to open"],
   c_food: ["食", "Food"], c_car: ["油／泊車", "Fuel/Parking"], c_ticket: ["門票", "Tickets"], c_transport: ["交通", "Transport"], c_super: ["超市", "Groceries"], c_other: ["其他", "Other"],
 };
 

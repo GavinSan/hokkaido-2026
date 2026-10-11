@@ -518,7 +518,7 @@ input, textarea, select, button { color: var(--ink); }
 .fly-path { position: relative; width: 84px; height: 22px; }
 .fly-path::before { content: ""; position: absolute; left: 0; right: 0; top: 10px; border-top: 2.5px dashed var(--ink); opacity: .7; }
 .fly-plane { position: absolute; top: 0; left: 0; animation: fly-across 3.6s ease-in-out infinite; }
-.fly-plane svg path:first-child { display: none; }
+.fly-plane svg > path:first-child { display: none; }
 @keyframes fly-across { 0% { transform: translate(-12px, 2px) rotate(-6deg); opacity: 0; } 12% { opacity: 1; } 50% { transform: translate(22px, -3px) rotate(0deg); } 88% { opacity: 1; } 100% { transform: translate(56px, 2px) rotate(6deg); opacity: 0; } }
 /* 設定 */
 .set-card { display: grid; gap: 10px; }
@@ -547,6 +547,28 @@ input, textarea, select, button { color: var(--ink); }
 .warn.center, .center { text-align: center; }
 .btn:disabled { opacity: .45; }
 .denied { padding-top: 20px; }
+
+/* ---------- v5 ---------- */
+.date-grid { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 10px; }
+.date-grid .fld { min-width: 0; }
+.input.date { -webkit-appearance: none; appearance: none; min-width: 0; width: 100%; max-width: 100%; display: block; height: 46px; text-align: left; }
+.input.date::-webkit-date-and-time-value { text-align: left; }
+.flights-drawer { display: grid; gap: 12px; margin-top: 6px; scroll-margin-top: 80px; }
+.flights-btn { display: flex; align-items: center; gap: 12px; padding: 10px 14px; width: 100%; text-align: left; background: #EAF4F8; }
+.flights-btn.open { background: #D6EAF2; }
+.fb-sky { position: relative; width: 74px; height: 44px; border: 2px solid var(--ink); border-radius: 12px; background: var(--mizu); overflow: hidden; flex: 0 0 auto; }
+.fb-cloud { position: absolute; height: 9px; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 999px; animation: cloud-pass 4s linear infinite; }
+.fb-cloud.c1 { width: 22px; top: 7px; left: 80px; }
+.fb-cloud.c2 { width: 16px; top: 27px; left: 80px; animation-delay: -2s; animation-duration: 3.2s; }
+@keyframes cloud-pass { to { transform: translateX(-120px); } }
+.fb-plane { position: absolute; left: 17px; top: 11px; animation: plane-bob 1.6s ease-in-out infinite; }
+.fb-plane svg > path:first-child { display: none; }
+@keyframes plane-bob { 50% { transform: translateY(-4px) rotate(-4deg); } }
+.fb-label { flex: 1; display: grid; font-weight: 700; font-size: 18px; line-height: 1.25; }
+.fb-label small { font-size: 12.5px; color: var(--muted); font-weight: 400; }
+.drop-in { display: grid; gap: 12px; }
+.drop-item { animation: drop-down .45s cubic-bezier(.3,1.4,.5,1) both; }
+@keyframes drop-down { from { opacity: 0; transform: translateY(-14px) scale(.97); } to { opacity: 1; transform: none; } }
 
 /* 「減少動態效果」：全部停晒 */
 @media (prefers-reduced-motion: reduce) {
