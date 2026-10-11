@@ -68,6 +68,8 @@ const S = {
   whereMoney: ["錢用咗去邊", "Where the money went"], viewBy: ["顯示方式", "View by"], byCat: ["分類", "Category"], byDay: ["每日", "Day"], all: ["全部", "All"], groupBy: ["分組", "Group by"],
   kittyCashSub: ["由公數袋俾", "Paid from the kitty"], notIncl: ["唔包", "Not incl."], sharesN: ["{n}份", "{n} shares"], paidTotal: ["俾咗", "Paid"],
   nowDoing: ["而家", "Now"], upNext: ["下一站", "Up next"], inMin: ["仲有 {x}", "in {x}"], dayDone: ["今日行程完咗 🌙", "Done for today 🌙"], startsAt: ["{x} 開始", "starts {x}"], goNow: ["導航", "Go"],
+  c_stay: ["住宿", "Lodging"], addCat: ["＋ 自訂", "＋ Custom"], newCatQ: ["新分類叫咩名？", "Name for the new category?"],
+  editExp: ["改支出", "Edit payment"], editCashFor: ["改{g}現金", "{g}: edit cash"], tapToEdit: ["撳任何一筆可以改", "Tap any payment to edit"],
   c_food: ["食", "Food"], c_car: ["油／泊車", "Fuel/Parking"], c_ticket: ["門票", "Tickets"], c_transport: ["交通", "Transport"], c_super: ["超市", "Groceries"], c_other: ["其他", "Other"],
 };
 
