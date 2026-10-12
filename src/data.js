@@ -187,3 +187,40 @@ export function fmtT(t) {
   const [h, m] = String(t).split(":").map(Number);
   return `${h % 12 || 12}:${String(m).padStart(2, "0")}${h < 12 ? "am" : "pm"}`;
 }
+
+/* ===== 私人東京行程（密碼先睇到）嘅預設 ===== */
+export const VAULT_TRIP = { title: "東京三日兩夜", titleEn: "Tokyo 3D2N", departISO: "2026-10-16T07:30:00+09:00" };
+export const VAULT_FLIGHTS = [
+  { id: "v1", no: "NH50", date: "10/16（五）", from: "CTS", fromName: "新千歲", dep: "07:30", to: "HND", toName: "羽田", arr: "09:05", who: "Gavin、Athena", color: "#F2A497", en: { date: "Fri 10/16", fromName: "New Chitose", toName: "Haneda", who: "Gavin, Athena" } },
+  { id: "v2", no: "待填", date: "10/18（日）", from: "TYO", fromName: "東京", dep: "—", to: "YYZ", toName: "多倫多", arr: "—", who: "Gavin、Athena", color: "#A8D3E6", en: { no: "TBC", date: "Sun 10/18", fromName: "Tokyo", toName: "Toronto", who: "Gavin, Athena" } },
+];
+export function vaultSeed(now) {
+  return {
+    "trip/meta": { seeded: now, v: 99, vault: true },
+    "trip/config": {
+      start: "2026-10-16", nDays: 3,
+      groups: { A: { name: "我哋", en: "Us", color: "#F2A497", members: ["Gavin", "Athena"], order: 0 } },
+    },
+    "trip/days": [
+      { d: "10/16", w: "五", icon: "plane", title: "札幌 → 東京", intro: "NH50 07:30 新千歲 → 09:05 羽田",
+        en: { title: "Sapporo → Tokyo", intro: "NH50 07:30 New Chitose → 09:05 Haneda" },
+        stops: [
+          { t: "05:00", name: "的士去新千歲", q: "新千歳空港", move: { t: "taxi", min: 60 }, note: "前一晚預約", en: { name: "Taxi to New Chitose", note: "Book the night before" } },
+          { t: "07:30", name: "NH50 → 羽田", q: "新千歳空港", move: { t: "plane", txt: "NH50" }, must: true, en: { name: "NH50 → Haneda" } },
+          { t: "09:05", name: "抵達羽田", q: "羽田空港 第2ターミナル", en: { name: "Arrive Haneda" } },
+        ] },
+      { d: "10/17", w: "六", icon: "clock", title: "東京", intro: "解鎖（🔒）之後撳「＋ 加行程」自己加。", en: { title: "Tokyo", intro: "Unlock (🔒) and tap “＋ Add stop” to fill this in." }, stops: [] },
+      { d: "10/18", w: "日", icon: "plane", title: "東京 → 多倫多", en: { title: "Tokyo → Toronto" },
+        stops: [
+          { t: "12:00", name: "飛多倫多（航班待填）", q: "羽田空港", move: { t: "plane", txt: "" }, must: true, note: "改返真正時間同航班", en: { name: "Fly to Toronto (flight TBC)", note: "Update the real time and flight" } },
+        ] },
+    ],
+    "trip/stays": { s1: { order: 1, name: "東京酒店", addr: "", dates: "10/16 → 10/18", who: "Gavin、Athena", en: { name: "Tokyo hotel", dates: "10/16 → 10/18", who: "Gavin, Athena" } } },
+    "trip/todo": {
+      t0: { text: "訂東京酒店", cat: "訂位", done: false, ts: now, en: "Book Tokyo hotel" },
+      t1: { text: "多倫多航班網上 check-in", cat: "證件", done: false, ts: now + 1, en: "Online check-in for Toronto flight" },
+      t2: { text: "加拿大 eTA", cat: "證件", done: false, ts: now + 2, en: "Canada eTA" },
+    },
+    "trip/kitty/rate": 0.052,
+  };
+}

@@ -97,6 +97,9 @@ const S = {
   flightsN: ["{n} 班機・撳開睇", "{n} flights · tap to open"],
   swapDay: ["同另一日對調", "Swap with another day"], swapHint: ["成日行程（標題、所有景點）會同揀咗嗰日交換，日期唔變。", "The whole plan (title and all stops) swaps with the chosen day; dates stay put."],
   swapGo: ["對調 {a} ⇄ {b}", "Swap {a} ⇄ {b}"],
+  vaultOn: ["私人東京行程", "Private Tokyo plan"], vaultExit: ["離開", "Exit"], vaultSub: ["2026・10/16 – 10/18・三日兩夜・之後飛多倫多", "2026 · Oct 16–18 · 3 days 2 nights · then Toronto"],
+  vaultHint: ["呢個行程同北海道分開儲存，要用密碼先開到。", "This plan is stored separately from Hokkaido and opens only with its code."],
+  vaultDepart: ["10/16（五）07:30 NH50 新千歲 → 羽田", "Fri 10/16 07:30 · NH50 New Chitose → Haneda"],
   c_food: ["食", "Food"], c_car: ["油／泊車", "Fuel/Parking"], c_ticket: ["門票", "Tickets"], c_transport: ["交通", "Transport"], c_super: ["超市", "Groceries"], c_other: ["其他", "Other"],
 };
 

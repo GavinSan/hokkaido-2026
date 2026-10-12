@@ -1,11 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { TRIP, PEOPLE, GROUPS, FLIGHTS, STAY_NEAR, STAYS_SEED, DAYS, BACKUP, TODO_SEED, EDIT_PIN, PREF, GROUP_COLORS, defaultConfig, applyConfig, dayList, fmtT } from "./data.js";
+import { TRIP, PEOPLE, GROUPS, FLIGHTS, STAY_NEAR, STAYS_SEED, DAYS, BACKUP, TODO_SEED, EDIT_PIN, PREF, GROUP_COLORS, defaultConfig, applyConfig, dayList, fmtT, VAULT_TRIP, VAULT_FLIGHTS, vaultSeed } from "./data.js";
 import { HeroArt, DayArt, HouseArt, PurseArt, BagArt, PlaneMini } from "./art.jsx";
-import { createStore, newKey, KEY_STORE } from "./store.js";
+import { createStore, newKey, KEY_STORE, IS_VAULT, vaultPath, VAULT_STORE } from "./store.js";
 import { LangCtx, useLang, useT, tr, pick, WEEK_EN, EN_DAYS, EN_STOPS, EN_TODO, EN_CAT, withEn } from "./i18n.js";
 
 const store = createStore();
-const SCHEMA_V = 5;
+// 私人東京行程：換標題同航班
+if (IS_VAULT) {
+  Object.assign(TRIP, VAULT_TRIP);
+  FLIGHTS.splice(0, FLIGHTS.length, ...VAULT_FLIGHTS);
+}
+const exitVault = () => { try { sessionStorage.removeItem(VAULT_STORE); } catch (e) { /* ignore */ } window.location.reload(); };
+const SCHEMA_V = 6;
 
 // v5：10/12 小樽改為 Plan B（下晝天狗山睇日落）
 function otaruPlanB(old) {
@@ -127,6 +133,12 @@ function useSeedAndMigrate() {
     const now = Date.now();
 
     // 全新數據庫
+    if (meta === null && IS_VAULT) {
+      done.current = true;
+      store.update(vaultSeed(now));
+      return;
+    }
+    if (IS_VAULT) { done.current = true; return; }
     if (meta === null) {
       done.current = true;
       const map = { "trip/meta": { seeded: now, v: SCHEMA_V }, "trip/days": withEn(DAYS), "trip/kitty/rate": 0.052, "trip/stays": STAYS_SEED };
@@ -140,6 +152,17 @@ function useSeedAndMigrate() {
       if (days === undefined || todo === undefined || stays === undefined || kitty === undefined) return;
       done.current = true;
       const map = { "trip/meta/v": SCHEMA_V };
+      if ((meta.v || 0) < 6) {
+        // v6：10/13 同 10/14 成日行程對調
+        const arr = asArray(days);
+        const a = arr.findIndex((d) => d.d === "10/13");
+        const b = arr.findIndex((d) => d.d === "10/14");
+        if (a >= 0 && b >= 0) {
+          const content = (x) => ({ title: x.title || "", intro: x.intro || "", en: x.en || null, icon: x.icon || "clock", stops: asArray(x.stops) });
+          map[`trip/days/${a}`] = { ...arr[a], ...content(arr[b]), d: arr[a].d, w: arr[a].w };
+          map[`trip/days/${b}`] = { ...arr[b], ...content(arr[a]), d: arr[b].d, w: arr[b].w };
+        }
+      }
       if ((meta.v || 0) < 5) {
         const oi = asArray(days).findIndex((d) => d.d === "10/12");
         if (oi >= 0) {
@@ -233,6 +256,13 @@ function PinSheet({ onOk, onClose, pin: PIN = EDIT_PIN }) {
     const next = (pin + k).slice(0, PIN.length);
     setPin(next);
     setBad(false);
+    if (next.length === 4 && !IS_VAULT) {
+      vaultPath(next).then((vp) => {
+        if (vp) { try { sessionStorage.setItem(VAULT_STORE, vp); } catch (e) { /* ignore */ } window.location.reload(); }
+        else if (PIN.length === 4) { if (next === PIN) onOk(); else { setBad(true); setPin(""); } }
+      });
+      if (PIN.length === 4) return;
+    }
     if (next.length === PIN.length) {
       if (next === PIN) setTimeout(onOk, 120);
       else setTimeout(() => { setBad(true); setPin(""); }, 150);
@@ -308,7 +338,7 @@ function Countdown({ goPlan, days }) {
             <div key={u} className="cd-cell"><div className="cd-num">{String(v).padStart(2, "0")}</div><div className="cd-unit">{t(u)}</div></div>
           ))}
         </div>
-        <div className="cd-foot">{t("departLine")}</div>
+        <div className="cd-foot">{IS_VAULT ? t("vaultDepart") : t("departLine")}</div>
       </div>
     );
   }
@@ -365,7 +395,7 @@ function Home({ goPlan, setTab, days, status }) {
     <div className="page">
       <div className="hero card"><HeroArt /></div>
       <h1 className="title">{lang === "en" ? TRIP.titleEn : TRIP.title}</h1>
-      <p className="subtitle">{t("subtitle")}</p>
+      <p className="subtitle">{IS_VAULT ? t("vaultSub") : t("subtitle")}</p>
       {di < 0 ? <Countdown goPlan={goPlan} days={days} /> : null}
 
       {today ? (
@@ -785,8 +815,8 @@ function Plan({ days, day, setDay, editing }) {
         {editing ? <button className="btn full ghost" onClick={() => setEditor({ idx: null })}>{t("addStop")}</button> : null}
       </div>
 
-      <h2 className="sec">{t("backup")}</h2>
-      {BACKUP.map((b) => (
+      {IS_VAULT ? null : <h2 className="sec">{t("backup")}</h2>}
+      {(IS_VAULT ? [] : BACKUP).map((b) => (
         <div key={b.name} className="card plain">
           <div className="tl-name">{pick(lang, b, "name")}</div>
           <div className="tl-note">{pick(lang, b, "addr")}・<a href={"tel:" + b.tel}>{b.tel}</a></div>
@@ -1812,7 +1842,7 @@ function Settings({ editing, askUnlock, lang, setLang, h12, setH12, cfg, days })
       </SetCard>
 
       <SetCard title={t("security")} locked={!editing} askUnlock={askUnlock}>
-        <PrivateLink editing={editing} />
+        {IS_VAULT ? <p className="hint">{t("vaultHint")}</p> : <PrivateLink editing={editing} />}
         <h3 className="set-sub">{t("pinTitle2")}</h3>
         <PinEditor editing={editing} />
       </SetCard>
@@ -1851,7 +1881,7 @@ export default function App() {
   const [lang, setLang] = usePersist("hok-lang", "zh");
   const [tab, setTab] = usePersist("hok-tab", "home");
   const [day, setDay] = useState(() => Math.max(0, tripDayIndex()));
-  const [editing, setEditing] = usePersist("hok-edit2", false);
+  const [editing, setEditing] = usePersist(IS_VAULT ? "hok-edit-vault" : "hok-edit2", IS_VAULT);
   const [pinOpen, setPinOpen] = useState(false);
   const [status, setStatus] = useState(store.mode === "local" ? "local" : "connecting");
   const [h12, setH12] = usePersist("hok-h12", false);
@@ -1879,11 +1909,12 @@ export default function App() {
     <LangCtx.Provider value={lang}>
       <div className={"app" + (lang === "en" ? " en" : "")}>
         <TopNav tab={tab} setTab={setTab} editing={editing} toggleEdit={toggleEdit} status={status} />
-        {editing ? <div className="edit-banner">{tr(lang, "editBanner")}</div> : null}
-        <main className={editing ? "with-banner" : ""}>
+        {editing && !IS_VAULT ? <div className="edit-banner">{tr(lang, "editBanner")}</div> : null}
+        {IS_VAULT ? <button className="vault-banner" onClick={exitVault}>🔒 {tr(lang, "vaultOn")}・<u>{tr(lang, "vaultExit")}</u></button> : null}
+        <main className={IS_VAULT ? "with-vault" : editing ? "with-banner" : ""}>
           {denied ? <DeniedScreen /> : null}
           {!denied && tab === "home" && <Home goPlan={goPlan} setTab={setTab} days={days} status={status} />}
-          {!denied && tab === "plan" && <Plan days={days} day={Math.min(day, days.length - 1)} setDay={setDay} editing={editing} />}
+          {!denied && tab === "plan" && <Plan days={days} day={day < days.length ? day : 0} setDay={setDay} editing={editing} />}
           {!denied && tab === "todo" && <Todo />}
           {!denied && tab === "stay" && <Stay editing={editing} />}
           {!denied && tab === "money" && <Money editing={editing} askUnlock={askUnlock} goSettings={() => setTab("settings")} />}

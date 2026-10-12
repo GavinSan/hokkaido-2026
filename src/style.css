@@ -579,6 +579,13 @@ input, textarea, select, button { color: var(--ink); }
 .swap-day small { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .swap-day.on { background: var(--yellow); box-shadow: 2px 2px 0 var(--ink); }
 
+/* ---------- 私人行程 ---------- */
+.vault-banner { position: fixed; left: 0; right: 0; top: calc(59px + env(safe-area-inset-top)); z-index: 48; background: #3E3A39; color: #FFFCF6; border: none; border-bottom: var(--line); text-align: center; font-size: 13px; font-weight: 700; padding: 4px 0; width: 100%; }
+.vault-banner.low { top: calc(85px + env(safe-area-inset-top)); }
+.vault-banner u { color: var(--yellow); }
+main.with-vault { padding-top: calc(92px + env(safe-area-inset-top)); }
+main.with-banner.with-vault { padding-top: calc(120px + env(safe-area-inset-top)); }
+
 /* 「減少動態效果」：全部停晒 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

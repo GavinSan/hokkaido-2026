@@ -141,8 +141,30 @@ function createFirebase(config, base) {
   };
 }
 
+/* ---------- 私人（東京）行程：用密碼計出嚟嘅路徑，唔喺 code 入面 ---------- */
+export const VAULT_STORE = "hok-vault";
+const VAULT_SALT = "hok-vault-v1:";
+const VAULT_CHECK = "beeb2b3bb2c8b7453a4635f489c70fd4e89803df4fdd64968cc1d55e28fe509c";
+async function sha256(txt) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt));
+  return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+// 啱密碼就返回私人路徑，唔啱返回 null
+export async function vaultPath(code) {
+  try {
+    if ((await sha256(VAULT_SALT + "check:" + code)) !== VAULT_CHECK) return null;
+    return await sha256(VAULT_SALT + "path:" + code);
+  } catch (e) { return null; }
+}
+export function currentVault() {
+  try { return sessionStorage.getItem(VAULT_STORE) || ""; } catch (e) { return ""; }
+}
+export const IS_VAULT = typeof window !== "undefined" && !!currentVault();
+
 export function createStore() {
   const cfg = typeof window !== "undefined" ? window.FIREBASE_CONFIG : null;
+  const vault = typeof window !== "undefined" ? currentVault() : "";
+  if (vault && cfg && cfg.apiKey) return createFirebase(cfg, `trips/${vault}`);
   const key = typeof window !== "undefined" ? currentKey() : "";
   if (cfg && cfg.apiKey && cfg.databaseURL && !String(cfg.apiKey).startsWith("PASTE")) return createFirebase(cfg, key ? `trips/${key}` : "trip");
   return createLocal();
