@@ -5,7 +5,26 @@ import { createStore, newKey, KEY_STORE } from "./store.js";
 import { LangCtx, useLang, useT, tr, pick, WEEK_EN, EN_DAYS, EN_STOPS, EN_TODO, EN_CAT, withEn } from "./i18n.js";
 
 const store = createStore();
-const SCHEMA_V = 4;
+const SCHEMA_V = 5;
+
+// v5：10/12 小樽改為 Plan B（下晝天狗山睇日落）
+function otaruPlanB(old) {
+  const keep = (re) => asArray(old).find((s) => re.test(s.name || ""));
+  const garaku = keep(/GARAKU/i) || { name: "湯咖哩 GARAKU", q: "スープカレー GARAKU 札幌", must: true, book: true, en: { name: "Soup Curry GARAKU" } };
+  const espresso = keep(/Espresso/i);
+  return [
+    ...(espresso ? [espresso] : []),
+    { t: "11:00", name: "小樽・堺町通商店街駐車場", q: "小樽 堺町 駐車場 港町7-7", move: { t: "car", min: 40 }, note: "一日最多 ¥1,000，泊一次行晒", en: { name: "Otaru – Sakaimachi parking", note: "Max ¥1,000/day; park once and walk" } },
+    { t: "11:10", name: "北一硝子・音樂盒堂本館", q: "小樽オルゴール堂本館", move: { t: "walk", min: 5 }, en: { name: "Kitaichi Glass & Music Box Museum" } },
+    { t: "12:00", name: "午餐（海鮮丼／壽司）", q: "小樽 寿司屋通り", move: { t: "walk", min: 5 }, dish: "海膽、蟹", note: "避開冇價錢牌／「時價」嘅蟹，落單前問總數", en: { name: "Lunch (seafood bowl / sushi)", dish: "Uni, crab", note: "Avoid unpriced menus and 'market price' crab — ask the total first" } },
+    { t: "13:00", name: "LeTAO 本店＋SNOOPY 茶屋", q: "小樽洋菓子舗ルタオ本店", move: { t: "walk", min: 5 }, must: true, en: { name: "LeTAO Main Store + Snoopy Chaya" } },
+    { t: "13:45", name: "小樽運河（淺草橋影相）", q: "浅草橋 小樽運河", move: { t: "walk", min: 10 }, must: true, note: "行一轉約15分鐘就夠", en: { name: "Otaru Canal (photos from Asakusa Bridge)", note: "A 15-minute stroll is enough" } },
+    { t: "14:15", name: "自由時間：三角市場／咖啡店", q: "小樽 三角市場", move: { t: "walk", min: 10 }, note: "休息、買手信，16:00 返車", en: { name: "Free time: Sankaku Market / café", note: "Rest, souvenirs; back to the car by 16:00" } },
+    { t: "16:20", name: "天狗山纜車・睇日落", q: "小樽天狗山ロープウエイ", move: { t: "car", min: 15 }, must: true, note: "纜車每12分鐘一班；16:40–17:20 睇日落（約17:00）", en: { name: "Tenguyama Ropeway – sunset", note: "Every 12 min; sunset around 17:00" } },
+    { ...garaku, t: "18:30", move: { t: "car", min: 50 }, note: "17:30 由天狗山直接出發", en: { ...(garaku.en || {}), name: (garaku.en && garaku.en.name) || "Soup Curry GARAKU", note: "Leave Tenguyama at 17:30" } },
+    { t: "20:15", name: "返住宿", q: "札幌市豊平区豊平1条7丁目2-7", move: { t: "car", min: 15 }, en: { name: "Back to the apartment" } },
+  ];
+}
 
 /* ---------------- 小工具 ---------------- */
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -121,6 +140,14 @@ function useSeedAndMigrate() {
       if (days === undefined || todo === undefined || stays === undefined || kitty === undefined) return;
       done.current = true;
       const map = { "trip/meta/v": SCHEMA_V };
+      if ((meta.v || 0) < 5) {
+        const oi = asArray(days).findIndex((d) => d.d === "10/12");
+        if (oi >= 0) {
+          map[`trip/days/${oi}/stops`] = otaruPlanB(asArray(days)[oi].stops);
+          map[`trip/days/${oi}/intro`] = "11:00 到小樽，下晝天狗山睇日落，17:30 直接返札幌食 GARAKU。";
+          map[`trip/days/${oi}/en/intro`] = "Otaru from 11:00, sunset on Tenguyama, then straight back to Sapporo for GARAKU.";
+        }
+      }
       asArray(days).forEach((d, di) => {
         if (!d.en && EN_DAYS[d.title]) map[`trip/days/${di}/en`] = EN_DAYS[d.title];
         asArray(d.stops).forEach((s, si) => {
