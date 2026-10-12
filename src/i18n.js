@@ -95,6 +95,8 @@ const S = {
   needLinkSub: ["呢個 app 嘅資料而家要用私人連結先睇到。請喺 WhatsApp group 撳嗰條連結，或者貼落下面。", "This app's data now needs the private link. Tap it in the WhatsApp group, or paste it below."],
   pasteLink: ["貼上連結", "Paste link"],
   flightsN: ["{n} 班機・撳開睇", "{n} flights · tap to open"],
+  swapDay: ["同另一日對調", "Swap with another day"], swapHint: ["成日行程（標題、所有景點）會同揀咗嗰日交換，日期唔變。", "The whole plan (title and all stops) swaps with the chosen day; dates stay put."],
+  swapGo: ["對調 {a} ⇄ {b}", "Swap {a} ⇄ {b}"],
   c_food: ["食", "Food"], c_car: ["油／泊車", "Fuel/Parking"], c_ticket: ["門票", "Tickets"], c_transport: ["交通", "Transport"], c_super: ["超市", "Groceries"], c_other: ["其他", "Other"],
 };
 

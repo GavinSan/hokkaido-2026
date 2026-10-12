@@ -21,7 +21,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
-button, input { font: inherit; color: inherit; }
+button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: inherit; }
 :focus-visible { outline: 3px dashed var(--coral); outline-offset: 2px; }
@@ -569,6 +569,15 @@ input, textarea, select, button { color: var(--ink); }
 .drop-in { display: grid; gap: 12px; }
 .drop-item { animation: drop-down .45s cubic-bezier(.3,1.4,.5,1) both; }
 @keyframes drop-down { from { opacity: 0; transform: translateY(-14px) scale(.97); } to { opacity: 1; transform: none; } }
+
+/* ---------- 對調日子 ---------- */
+.swap-box { margin-top: 18px; padding-top: 12px; border-top: 2px dashed var(--ink); display: grid; gap: 8px; }
+.swap-box .hint { margin: 0; }
+.swap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.swap-day { display: grid; text-align: left; border: 2px solid var(--ink); border-radius: 14px; background: var(--paper); padding: 6px 10px; line-height: 1.3; }
+.swap-day b { font-size: 13.5px; }
+.swap-day small { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.swap-day.on { background: var(--yellow); box-shadow: 2px 2px 0 var(--ink); }
 
 /* 「減少動態效果」：全部停晒 */
 @media (prefers-reduced-motion: reduce) {

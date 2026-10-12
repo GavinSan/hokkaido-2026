@@ -609,8 +609,10 @@ function TimeAsk({ ask, onOk, onClose }) {
   );
 }
 
-function DayEditor({ day, onSave, onClose }) {
+function DayEditor({ day, dayIdx, days, onSave, onSwap, onClose }) {
   const t = useT();
+  const lang = useLang();
+  const [swapWith, setSwapWith] = useState(null);
   const [f, setF] = useState({ title: day.title || "", intro: day.intro || "", titleEn: (day.en && day.en.title) || "", introEn: (day.en && day.en.intro) || "" });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   return (
@@ -622,6 +624,23 @@ function DayEditor({ day, onSave, onClose }) {
         <label className="fld"><span>{t("introEn")}</span><textarea className="input" rows={2} value={f.introEn} onChange={set("introEn")} /></label>
         <button className="btn full" type="submit">{t("save")}</button>
       </form>
+      <div className="swap-box">
+        <h3 className="set-sub">{t("swapDay")}</h3>
+        <p className="hint">{t("swapHint")}</p>
+        <div className="swap-grid">
+          {days.map((d, i) => i === dayIdx ? null : (
+            <button key={i} type="button" className={"swap-day" + (swapWith === i ? " on" : "")} onClick={() => setSwapWith(i)}>
+              <b>D{i + 1}・{d.d}（{weekday(lang, d.w)}）</b>
+              <small>{pick(lang, d, "title")}</small>
+            </button>
+          ))}
+        </div>
+        {swapWith != null ? (
+          <button type="button" className="btn full yellow" onClick={() => onSwap(swapWith)}>
+            {t("swapGo", { a: `D${dayIdx + 1}`, b: `D${swapWith + 1}` })}
+          </button>
+        ) : null}
+      </div>
     </Sheet>
   );
 }
@@ -749,7 +768,15 @@ function Plan({ days, day, setDay, editing }) {
       ))}
 
       {editor === "day" ? (
-        <DayEditor day={data} onClose={() => setEditor(null)} onSave={(v) => {
+        <DayEditor day={data} dayIdx={day} days={days} onClose={() => setEditor(null)} onSwap={(j) => {
+          // 對調兩日嘅內容（日期唔變）
+          const a = days[day], b = days[j];
+          const content = (x) => ({ title: x.title || "", intro: x.intro || "", en: x.en || null, icon: x.icon || "clock", stops: asArray(x.stops) });
+          const ca = content(a), cb = content(b);
+          store.update({ [`trip/days/${day}`]: { ...a, ...cb, d: a.d, w: a.w }, [`trip/days/${j}`]: { ...b, ...ca, d: b.d, w: b.w } });
+          setEditor(null);
+          setDay(j);
+        }} onSave={(v) => {
           const en = {};
           if (v.titleEn.trim()) en.title = v.titleEn.trim();
           if (v.introEn.trim()) en.intro = v.introEn.trim();
