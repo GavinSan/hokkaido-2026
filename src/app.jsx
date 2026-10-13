@@ -11,7 +11,37 @@ if (IS_VAULT) {
   FLIGHTS.splice(0, FLIGHTS.length, ...VAULT_FLIGHTS);
 }
 const exitVault = () => { try { sessionStorage.removeItem(VAULT_STORE); } catch (e) { /* ignore */ } window.location.reload(); };
-const SCHEMA_V = 6;
+const SCHEMA_V = 7;
+
+// v7：登別併入 10/14 大圈；10/15 改做札幌 chill day
+function loopDay(old) {
+  const keep = (re) => asArray(old).find((s) => re.test(s.name || ""));
+  const hanamaru = keep(/花丸/) || { name: "根室花丸迴轉壽司", q: "回転寿司 根室花まる JRタワーステラプレイス店", must: true, note: "唔訂得位，現場取票", en: { name: "Nemuro Hanamaru Conveyor Sushi", note: "No bookings — get a ticket on arrival" } };
+  const home = keep(/返住宿/) || { name: "返住宿", q: "札幌市豊平区豊平1条7丁目2-7", en: { name: "Back to the apartment" } };
+  return [
+    { t: "09:50", name: "定山溪（二見吊橋・足湯）", q: "定山渓 二見吊橋", move: { t: "car", min: 50 }, note: "朝早有雨都OK，睇紅葉、浸足湯", en: { name: "Jozankei (Futami Bridge, foot bath)", note: "Fine even in morning rain — leaves and foot bath" } },
+    { t: "11:00", name: "中山峠（揚げいも）", q: "道の駅 望羊中山", move: { t: "car", min: 30 }, note: "10分鐘小休", en: { name: "Nakayama Pass (age-imo)", note: "Quick 10-min stop" } },
+    { t: "11:45", name: "洞爺湖サイロ展望台", q: "サイロ展望台 洞爺湖", move: { t: "car", min: 40 }, must: true, en: { name: "Lake Toya Silo Observatory" } },
+    { t: "12:15", name: "午餐：でめきん食堂", q: "でめきん食堂 洞爺湖温泉", move: { t: "car", min: 15 }, dish: "拉麵、炒飯（份量好大）", note: "11:00–13:30，星期二休；0142-75-3511", en: { name: "Lunch: Demekin Shokudo", dish: "Ramen, fried rice (huge portions)", note: "11:00–13:30, closed Tue; 0142-75-3511" } },
+    { t: "13:30", name: "有珠山纜車＋昭和新山", q: "有珠山ロープウェイ", move: { t: "car", min: 15 }, must: true, note: "下晝先轉好天；最後一班約17:15，風大或會停", en: { name: "Mt. Usu Ropeway + Showa-Shinzan", note: "Weather clears in the afternoon; last ride ~17:15, may stop in strong wind" } },
+    { t: "15:45", name: "登別地獄谷＋大湯沼", q: "登別地獄谷", move: { t: "car", min: 50 }, must: true, note: "行一個鐘，16:45 回札幌", en: { name: "Noboribetsu Hell Valley + Oyunuma", note: "About an hour; head back at 16:45" } },
+    { ...hanamaru, t: "19:00", move: { t: "car", min: 80 } },
+    { ...home, t: "21:00", move: { t: "car", min: 15 } },
+  ];
+}
+function chillDay(old) {
+  const keep = (re) => asArray(old).find((s) => re.test(s.name || ""));
+  const toriton = keep(/Toriton|トリトン/i) || { name: "Toriton 迴轉壽司", q: "トリトン 手稲店", must: true, book: true, note: "打電話問7人位", en: { name: "Toriton Conveyor Sushi" } };
+  const home = keep(/返住宿/) || { name: "返住宿", q: "札幌市豊平区豊平1条7丁目2-7", en: { name: "Back to the apartment" } };
+  return [
+    { t: "09:30", name: "ATELIER Morihiko（早餐）", q: "ATELIER Morihiko 札幌", move: { t: "car", min: 15 }, note: "Morning set 8:00–11:00；或者 10:00 去森彦本店（舊木屋）", en: { name: "ATELIER Morihiko (breakfast)", note: "Morning set 8:00–11:00; or Morihiko main (old wooden house) from 10:00" } },
+    { t: "11:30", name: "円山散步／小店", q: "円山公園駅", move: { t: "car", min: 10 }, note: "慢慢行，唔趕", en: { name: "Maruyama stroll / little shops", note: "No rush" } },
+    { t: "13:30", name: "札幌站買手信（Stellar Place／大丸）", q: "札幌ステラプレイス", move: { t: "car", min: 15 }, note: "聽日分組走，今日買定手信", en: { name: "Souvenirs at Sapporo Station (Stellar Place / Daimaru)", note: "Groups split tomorrow — shop today" } },
+    { t: "16:00", name: "返住宿休息／執行李", q: "札幌市豊平区豊平1条7丁目2-7", move: { t: "car", min: 15 }, en: { name: "Rest & pack at the apartment" } },
+    { ...toriton, t: "19:00", move: { t: "car", min: 30 } },
+    { ...home, t: "21:00", move: { t: "car", min: 30 } },
+  ];
+}
 
 // v5：10/12 小樽改為 Plan B（下晝天狗山睇日落）
 function otaruPlanB(old) {
@@ -152,15 +182,36 @@ function useSeedAndMigrate() {
       if (days === undefined || todo === undefined || stays === undefined || kitty === undefined) return;
       done.current = true;
       const map = { "trip/meta/v": SCHEMA_V };
+      const work = asArray(days).map((d) => ({ ...d }));
       if ((meta.v || 0) < 6) {
-        // v6：10/13 同 10/14 成日行程對調
-        const arr = asArray(days);
-        const a = arr.findIndex((d) => d.d === "10/13");
-        const b = arr.findIndex((d) => d.d === "10/14");
+        // v6：10/13 同 10/14 成日行程對調（逐個欄位寫，避免同後面衝突）
+        const a = work.findIndex((d) => d.d === "10/13");
+        const b = work.findIndex((d) => d.d === "10/14");
         if (a >= 0 && b >= 0) {
-          const content = (x) => ({ title: x.title || "", intro: x.intro || "", en: x.en || null, icon: x.icon || "clock", stops: asArray(x.stops) });
-          map[`trip/days/${a}`] = { ...arr[a], ...content(arr[b]), d: arr[a].d, w: arr[a].w };
-          map[`trip/days/${b}`] = { ...arr[b], ...content(arr[a]), d: arr[b].d, w: arr[b].w };
+          const A = work[a], B = work[b];
+          const pick5 = (x) => ({ title: x.title || "", intro: x.intro || "", en: x.en || null, icon: x.icon || "clock", stops: asArray(x.stops) });
+          const ca = pick5(A), cb = pick5(B);
+          work[a] = { ...A, ...cb }; work[b] = { ...B, ...ca };
+          ["title", "intro", "en", "icon", "stops"].forEach((k) => { map[`trip/days/${a}/${k}`] = cb[k]; map[`trip/days/${b}/${k}`] = ca[k]; });
+        }
+      }
+      if ((meta.v || 0) < 7) {
+        const arr = work;
+        const a = arr.findIndex((d) => d.d === "10/14");
+        const b = arr.findIndex((d) => d.d === "10/15");
+        if (a >= 0) {
+          map[`trip/days/${a}/stops`] = loopDay(arr[a].stops);
+          map[`trip/days/${a}/title`] = "定山溪・洞爺湖・登別";
+          map[`trip/days/${a}/intro`] = "09:00 出發兜一個大圈：定山溪 → 洞爺湖 → 有珠山 → 登別 → 札幌（車程約4.5小時）。朝早有雨，下晝轉好。";
+          map[`trip/days/${a}/en`] = { title: "Jozankei · Lake Toya · Noboribetsu", intro: "Leave 09:00 for a loop: Jozankei → Lake Toya → Mt. Usu → Noboribetsu → Sapporo (~4.5h driving). Rain in the morning, clearing later." };
+          map[`trip/days/${a}/icon`] = "lake";
+        }
+        if (b >= 0) {
+          map[`trip/days/${b}/stops`] = chillDay(arr[b].stops);
+          map[`trip/days/${b}/title`] = "札幌 chill day";
+          map[`trip/days/${b}/intro`] = "朝早 cafe，下晝買手信，夜晚 Toriton。";
+          map[`trip/days/${b}/en`] = { title: "Easy day in Sapporo", intro: "Café morning, souvenirs in the afternoon, Toriton for dinner." };
+          map[`trip/days/${b}/icon`] = "clock";
         }
       }
       if ((meta.v || 0) < 5) {
