@@ -1312,61 +1312,96 @@ function ExpenseList({ expenses, editing, cats, rate, onEdit }) {
   const t = useT();
   const lang = useLang();
   const [gb, setGb] = usePersist("hok-exp-group", "day");
+  const [sortBy, setSortBy] = usePersist("hok-exp-sort", "new");
+  const [closed, setClosed] = usePersist("hok-exp-closed", {});
   const sum = (items) => items.reduce((s, e) => s + (Number(e.amt) || 0), 0);
+  const latest = (items) => Math.max(0, ...items.map((e) => e.ts || 0));
+  const itemCmp = {
+    new: (x, y) => (y.ts || 0) - (x.ts || 0),
+    old: (x, y) => (x.ts || 0) - (y.ts || 0),
+    high: (x, y) => (Number(y.amt) || 0) - (Number(x.amt) || 0),
+    low: (x, y) => (Number(x.amt) || 0) - (Number(y.amt) || 0),
+  }[sortBy] || ((x, y) => (y.ts || 0) - (x.ts || 0));
+
   let groups;
-  if (gb === "all") groups = [{ key: "all", title: null, items: expenses }];
+  if (gb === "all") groups = [{ key: "all", title: t("allExp"), items: expenses }];
   else if (gb === "day") {
-    groups = dayList().map((d, i) => ({ key: i, title: `Day ${i + 1}・${d.d}（${weekday(lang, d.w)}）`, items: expenses.filter((e) => (Number(e.day) || 0) === i) }))
-      .filter((g) => g.items.length).reverse();
+    groups = dayList().map((d, i) => ({ key: i, order: i, title: `Day ${i + 1}・${d.d}（${weekday(lang, d.w)}）`, items: expenses.filter((e) => (Number(e.day) || 0) === i) }))
+      .filter((g) => g.items.length);
   } else if (gb === "payer") {
     groups = [{ id: "kitty", color: "#F6D27A" }, ...GROUPS.map((g) => ({ id: g.id, color: g.color }))]
       .map((o) => ({ key: o.id, title: o.id === "kitty" ? t("kittyCash") : t("cardOf", { g: pick(lang, groupOf(o.id), "name") }), color: o.color, items: expenses.filter((e) => (e.payer || "kitty") === o.id) }))
       .filter((g) => g.items.length);
   } else {
     groups = cats.map((c) => ({ key: c.id, title: catName(lang, cats, c.id), color: c.color, items: expenses.filter((e) => (catInfo(cats, e.cat).id) === c.id) }))
-      .filter((g) => g.items.length).sort((a, b) => sum(b.items) - sum(a.items));
+      .filter((g) => g.items.length);
   }
+  // 組嘅次序跟排序方式
+  groups.forEach((g) => g.items.sort(itemCmp));
+  groups.sort((x, y) => {
+    if (sortBy === "high") return sum(y.items) - sum(x.items);
+    if (sortBy === "low") return sum(x.items) - sum(y.items);
+    if (gb === "day") return sortBy === "old" ? x.order - y.order : y.order - x.order;
+    return sortBy === "old" ? latest(x.items) - latest(y.items) : latest(y.items) - latest(x.items);
+  });
+
+  const ck = (key) => `${gb}:${key}`;
+  const isClosed = (key) => !!closed[ck(key)];
+  const toggle = (key) => setClosed({ ...closed, [ck(key)]: !isClosed(key) });
+  const allClosed = groups.length > 0 && groups.every((g) => isClosed(g.key));
+  const setAll = (v) => { const next = { ...closed }; groups.forEach((g) => { next[ck(g.key)] = v; }); setClosed(next); };
+
   return (
     <div className="exp-wrap">
       <Seg full label={t("groupBy")} value={gb} onChange={setGb} options={[["day", t("byDay")], ["cat", t("byCat")], ["payer", t("byPayer")], ["all", t("all")]]} />
+      <div className="exp-tools">
+        <span className="tools-label">{t("sortBy")}</span>
+        <Seg label={t("sortBy")} value={sortBy} onChange={setSortBy} options={[["new", t("s_new")], ["old", t("s_old")], ["high", t("s_high")], ["low", t("s_low")]]} />
+      </div>
+      {groups.length > 1 ? (
+        <button type="button" className="link-btn fold-all" onClick={() => setAll(!allClosed)}>{allClosed ? t("expandAll") : t("collapseAll")}</button>
+      ) : null}
       {expenses.length === 0 ? <div className="card plain empty">{t("noExp")}</div> : null}
-      {groups.map((grp) => (
-        <div key={grp.key} className="exp-group">
-          {grp.title ? (
-            <div className="exp-ghead">
-              <span>{grp.color ? <span className="key-dot" style={{ background: grp.color }} /> : null}{grp.title}</span>
+      {groups.map((grp) => {
+        const shut = isClosed(grp.key);
+        return (
+          <div key={grp.key} className={"exp-group" + (shut ? " shut" : "")}>
+            <button type="button" className="exp-ghead" onClick={() => toggle(grp.key)} aria-expanded={!shut}>
+              <span className="gh-left"><span className={"fold-chev" + (shut ? "" : " open")} aria-hidden="true">▸</span>{grp.color ? <span className="key-dot" style={{ background: grp.color }} /> : null}{grp.title}</span>
               <span className="muted">{grp.items.length}・<b>{yen(sum(grp.items))}</b></span>
-            </div>
-          ) : null}
-          <ul className="exp-list">
-            {grp.items.map((e) => {
-              const p = e.payer || "kitty";
-              const g = groupOf(p);
-              const sp = e.split || allSplit();
-              const ci = catInfo(cats, e.cat);
-              const Tag = editing ? "button" : "div";
-              return (
-                <li key={e.id}>
-                  <Tag className={"card exp" + (editing ? " tappable" : "")} onClick={editing ? () => onEdit(e) : undefined} type={editing ? "button" : undefined}>
-                    <span className="key-dot big" style={{ background: ci.color }} aria-hidden="true" />
-                    <span className="exp-main">
-                      <span className="exp-what">{e.what === e.cat ? catName(lang, cats, e.cat) : e.what}</span>
-                      <span className="exp-meta">
-                        {gb !== "day" ? <span className="tag tiny" style={{ background: "#F4EFE8" }}>D{(Number(e.day) || 0) + 1}</span> : null}
-                        {gb !== "cat" ? <span className="tag tiny" style={{ background: "#F4EFE8" }}>{catName(lang, cats, e.cat)}</span> : null}
-                        {gb === "payer" ? null : <span className="tag tiny" style={{ background: g ? g.color : "#F6D27A" }}>{p === "kitty" ? t("kittyCash") : t("cardOf", { g: pick(lang, g, "name") })}</span>}
-                        {sp !== allSplit() ? <span className="tag tiny ghost-tag">{t("onlyFor", { g: sp.split("").join("+") })}</span> : null}
-                      </span>
-                    </span>
-                    <Yen v={e.amt} rate={rate} cls="exp-amt right" />
-                    {editing ? <span className="exp-edit" aria-hidden="true">›</span> : null}
-                  </Tag>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
+            </button>
+            {shut ? null : (
+              <ul className="exp-list fold-in">
+                {grp.items.map((e) => {
+                  const p = e.payer || "kitty";
+                  const g = groupOf(p);
+                  const sp = e.split || allSplit();
+                  const ci = catInfo(cats, e.cat);
+                  const Tag = editing ? "button" : "div";
+                  return (
+                    <li key={e.id}>
+                      <Tag className={"card exp" + (editing ? " tappable" : "")} onClick={editing ? () => onEdit(e) : undefined} type={editing ? "button" : undefined}>
+                        <span className="key-dot big" style={{ background: ci.color }} aria-hidden="true" />
+                        <span className="exp-main">
+                          <span className="exp-what">{e.what === e.cat ? catName(lang, cats, e.cat) : e.what}</span>
+                          <span className="exp-meta">
+                            {gb !== "day" ? <span className="tag tiny" style={{ background: "#F4EFE8" }}>D{(Number(e.day) || 0) + 1}</span> : null}
+                            {gb !== "cat" ? <span className="tag tiny" style={{ background: "#F4EFE8" }}>{catName(lang, cats, e.cat)}</span> : null}
+                            {gb === "payer" ? null : <span className="tag tiny" style={{ background: g ? g.color : "#F6D27A" }}>{p === "kitty" ? t("kittyCash") : t("cardOf", { g: pick(lang, g, "name") })}</span>}
+                            {sp !== allSplit() ? <span className="tag tiny ghost-tag">{t("onlyFor", { g: sp.split("").join("+") })}</span> : null}
+                          </span>
+                        </span>
+                        <Yen v={e.amt} rate={rate} cls="exp-amt right" />
+                        {editing ? <span className="exp-edit" aria-hidden="true">›</span> : null}
+                      </Tag>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        );
+      })}
       {editing && expenses.length ? <p className="hint center">{t("tapToEdit")}</p> : null}
     </div>
   );

@@ -586,6 +586,18 @@ input, textarea, select, button { color: var(--ink); }
 main.with-vault { padding-top: calc(92px + env(safe-area-inset-top)); }
 main.with-banner.with-vault { padding-top: calc(120px + env(safe-area-inset-top)); }
 
+/* ---------- 支出收埋／排序 ---------- */
+.exp-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tools-label { font-size: 13px; font-weight: 700; color: var(--muted); }
+.exp-tools .seg button { padding: 4px 10px; font-size: 13px; }
+.fold-all { justify-self: end; font-size: 13.5px; }
+button.exp-ghead { width: 100%; border: 2px solid var(--ink); border-radius: 14px; background: #F4EFE8; padding: 6px 10px; margin-top: 4px; text-align: left; cursor: pointer; }
+.exp-group.shut button.exp-ghead { background: var(--paper); }
+.gh-left { display: inline-flex; align-items: center; gap: 2px; }
+.fold-chev { display: inline-block; width: 16px; font-size: 13px; transition: transform .2s ease; }
+.fold-chev.open { transform: rotate(90deg); }
+.fold-in { animation: drop-down .3s ease both; }
+
 /* 「減少動態效果」：全部停晒 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

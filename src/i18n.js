@@ -100,6 +100,8 @@ const S = {
   vaultOn: ["私人東京行程", "Private Tokyo plan"], vaultExit: ["離開", "Exit"], vaultSub: ["2026・10/16 – 10/18・三日兩夜・之後飛多倫多", "2026 · Oct 16–18 · 3 days 2 nights · then Toronto"],
   vaultHint: ["呢個行程同北海道分開儲存，要用密碼先開到。", "This plan is stored separately from Hokkaido and opens only with its code."],
   vaultDepart: ["10/16（五）07:30 NH50 新千歲 → 羽田", "Fri 10/16 07:30 · NH50 New Chitose → Haneda"],
+  sortBy: ["排序", "Sort"], s_new: ["最新", "Newest"], s_old: ["最舊", "Oldest"], s_high: ["$ 高", "$ High"], s_low: ["$ 低", "$ Low"],
+  collapseAll: ["全部收埋", "Collapse all"], expandAll: ["全部打開", "Expand all"], allExp: ["全部支出", "All payments"],
   c_food: ["食", "Food"], c_car: ["油／泊車", "Fuel/Parking"], c_ticket: ["門票", "Tickets"], c_transport: ["交通", "Transport"], c_super: ["超市", "Groceries"], c_other: ["其他", "Other"],
 };
 
