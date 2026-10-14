@@ -11,7 +11,7 @@ if (IS_VAULT) {
   FLIGHTS.splice(0, FLIGHTS.length, ...VAULT_FLIGHTS);
 }
 const exitVault = () => { try { sessionStorage.removeItem(VAULT_STORE); } catch (e) { /* ignore */ } window.location.reload(); };
-const SCHEMA_V = 8;
+const SCHEMA_V = 9;
 
 // v7：登別併入 10/14 大圈；10/15 改做札幌 chill day
 function loopDay(old) {
@@ -36,10 +36,12 @@ function chillDay(old) {
   const toriton = keep(/Toriton|トリトン/i) || { name: "Toriton 迴轉壽司", q: "トリトン 手稲店", must: true, book: true, note: "打電話問7人位", en: { name: "Toriton Conveyor Sushi" } };
   const home = keep(/返住宿/) || { name: "返住宿", q: "札幌市豊平区豊平1条7丁目2-7", en: { name: "Back to the apartment" } };
   return [
-    { t: "09:30", name: "ATELIER Morihiko（早餐）", q: "ATELIER Morihiko 札幌", move: { t: "car", min: 15 }, note: "Morning set 8:00–11:00；或者 10:00 去森彦本店（舊木屋）", en: { name: "ATELIER Morihiko (breakfast)", note: "Morning set 8:00–11:00; or Morihiko main (old wooden house) from 10:00" } },
-    { t: "11:00", name: "Costco 札幌倉庫店", q: "コストコ 札幌倉庫店", move: { t: "car", min: 25 }, note: "約 10:00–20:00；要會員卡；food court 食 lunch。聽日搭機，留意行李重量", en: { name: "Costco Sapporo", note: "About 10:00–20:00; membership card needed; lunch at the food court. Mind luggage weight for tomorrow's flights" } },
-    { t: "14:00", name: "札幌站買手信（Stellar Place／大丸）", q: "札幌ステラプレイス", move: { t: "car", min: 30 }, note: "聽日分組走，今日買定手信", en: { name: "Souvenirs at Sapporo Station (Stellar Place / Daimaru)", note: "Groups split tomorrow — shop today" } },
-    { t: "16:30", name: "返住宿休息／執行李", q: "札幌市豊平区豊平1条7丁目2-7", move: { t: "car", min: 15 }, en: { name: "Rest & pack at the apartment" } },
+    { t: "09:00", name: "ATELIER Morihiko（早餐）", q: "ATELIER Morihiko 札幌", move: { t: "car", min: 15 }, note: "Morning set 8:00–11:00", en: { name: "ATELIER Morihiko (breakfast)", note: "Morning set 8:00–11:00" } },
+    { t: "10:30", name: "Costco 札幌倉庫店", q: "コストコ 札幌倉庫店", move: { t: "car", min: 25 }, must: true, note: "10:00 開；要會員卡；food court 食 lunch；留意聽日行李重量", en: { name: "Costco Sapporo", note: "Opens 10:00; membership card needed; lunch at the food court; mind tomorrow's luggage weight" } },
+    { t: "12:30", name: "三井 Outlet Park 札幌北廣島", q: "三井アウトレットパーク 札幌北広島", move: { t: "car", min: 15 }, must: true, note: "10:00–20:00，約170間；Nike、adidas、Under Armour、ASICS、North Face；免費泊車", en: { name: "Mitsui Outlet Park Sapporo Kitahiroshima", note: "10:00–20:00, ~170 shops; Nike, adidas, Under Armour, ASICS, North Face; free parking" } },
+    { t: "15:30", name: "（可選）ES CON Field 北海道", q: "エスコンフィールド北海道", move: { t: "car", min: 10 }, note: "火腿鬥士球場；冇比賽日部分區域免費入", en: { name: "(Optional) ES CON Field Hokkaido", note: "Fighters' ballpark; some areas free on non-game days" } },
+    { t: "16:30", name: "札幌站 JR Tower／Stellar Place／大丸", q: "札幌ステラプレイス", move: { t: "car", min: 40 }, note: "最後買手信", en: { name: "Sapporo Station: JR Tower / Stellar Place / Daimaru", note: "Last souvenirs" } },
+    { t: "17:45", name: "JR Tower 展望室 T38 夜景", q: "JRタワー展望室 T38", move: { t: "walk", min: 5 }, note: "38樓，10:00–22:00，成人 ¥740", en: { name: "JR Tower T38 night view", note: "38F, 10:00–22:00, adult ¥740" } },
     { ...toriton, t: "19:00", move: { t: "car", min: 30 } },
     { ...home, t: "21:00", move: { t: "car", min: 30 } },
   ];
@@ -245,6 +247,15 @@ function useSeedAndMigrate() {
           ["title", "intro", "en", "icon", "stops"].forEach((k) => { map[`trip/days/${a}/${k}`] = cb[k]; map[`trip/days/${b}/${k}`] = ca[k]; });
         }
       }
+      if ((meta.v || 0) < 9 && (meta.v || 0) >= 8) {
+        const b9 = work.findIndex((d) => d.d === "10/15");
+        if (b9 >= 0) {
+          map[`trip/days/${b9}/stops`] = chillDay(work[b9].stops);
+          map[`trip/days/${b9}/title`] = "Cafe・Costco・Outlet";
+          map[`trip/days/${b9}/intro`] = "朝早 cafe → Costco → 北廣島 Outlet → 札幌站／T38 夜景 → Toriton。";
+          map[`trip/days/${b9}/en`] = { title: "Café · Costco · Outlet", intro: "Café → Costco → Kitahiroshima outlet → Sapporo Station / T38 night view → Toriton." };
+        }
+      }
       if ((meta.v || 0) < 8) {
         const arr = work;
         const a = arr.findIndex((d) => d.d === "10/14");
@@ -258,9 +269,9 @@ function useSeedAndMigrate() {
         }
         if (b >= 0) {
           map[`trip/days/${b}/stops`] = chillDay(arr[b].stops);
-          map[`trip/days/${b}/title`] = "札幌 chill day";
-          map[`trip/days/${b}/intro`] = "朝早 cafe，Costco，下晝買手信，夜晚 Toriton。";
-          map[`trip/days/${b}/en`] = { title: "Easy day in Sapporo", intro: "Café morning, Costco, souvenirs in the afternoon, Toriton for dinner." };
+          map[`trip/days/${b}/title`] = "Cafe・Costco・Outlet";
+          map[`trip/days/${b}/intro`] = "朝早 cafe → Costco → 北廣島 Outlet → 札幌站／T38 夜景 → Toriton。";
+          map[`trip/days/${b}/en`] = { title: "Café · Costco · Outlet", intro: "Café → Costco → Kitahiroshima outlet → Sapporo Station / T38 night view → Toriton." };
           map[`trip/days/${b}/icon`] = "clock";
         }
       }
