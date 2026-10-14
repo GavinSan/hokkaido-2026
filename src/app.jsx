@@ -11,7 +11,7 @@ if (IS_VAULT) {
   FLIGHTS.splice(0, FLIGHTS.length, ...VAULT_FLIGHTS);
 }
 const exitVault = () => { try { sessionStorage.removeItem(VAULT_STORE); } catch (e) { /* ignore */ } window.location.reload(); };
-const SCHEMA_V = 11;
+const SCHEMA_V = 12;
 
 // v7：登別併入 10/14 大圈；10/15 改做札幌 chill day
 function loopDay(old) {
@@ -36,11 +36,11 @@ function chillDay(old) {
   const toriton = keep(/Toriton|トリトン/i) || { name: "Toriton 迴轉壽司", q: "トリトン 手稲店", must: true, book: true, note: "打電話問7人位", en: { name: "Toriton Conveyor Sushi" } };
   const home = keep(/返住宿/) || { name: "返住宿", q: "札幌市豊平区豊平1条7丁目2-7", en: { name: "Back to the apartment" } };
   return [
-    { t: "09:00", name: "ATELIER Morihiko（早餐）", q: "ATELIER Morihiko 札幌", move: { t: "car", min: 15 }, note: "Morning set 8:00–11:00", en: { name: "ATELIER Morihiko (breakfast)", note: "Morning set 8:00–11:00" } },
-    { t: "10:30", name: "Costco 札幌倉庫店", q: "コストコ 札幌倉庫店", move: { t: "car", min: 25 }, must: true, note: "10:00 開；要會員卡；留意聽日行李重量", en: { name: "Costco Sapporo", note: "Opens 10:00; membership card needed; mind tomorrow's luggage weight" } },
-    { t: "12:00", name: "午餐：札幌鮭ラーメン 麺匠 赤松", q: "札幌鮭ラーメン麺匠 赤松", move: { t: "car", min: 5 }, must: true, dish: "鮭だし醤油／鮭だし味噌", note: "食べログ 3.53；11:30–14:45（一、二休）；只收現金；賣晒會早收", en: { name: "Lunch: Sapporo Salmon Ramen Akamatsu", dish: "Salmon-dashi shoyu / miso", note: "Tabelog 3.53; 11:30–14:45 (closed Mon–Tue); cash only; may close early when sold out" } },
-    { t: "13:00", name: "三井 Outlet Park 札幌北廣島", q: "三井アウトレットパーク 札幌北広島", move: { t: "car", min: 15 }, must: true, note: "10:00–20:00，約170間；Nike、adidas、Under Armour、ASICS、North Face；免費泊車", en: { name: "Mitsui Outlet Park Sapporo Kitahiroshima", note: "10:00–20:00, ~170 shops; Nike, adidas, Under Armour, ASICS, North Face; free parking" } },
-    { t: "16:30", name: "札幌站 JR Tower／Stellar Place／大丸", q: "札幌ステラプレイス", move: { t: "car", min: 40 }, note: "最後買手信", en: { name: "Sapporo Station: JR Tower / Stellar Place / Daimaru", note: "Last souvenirs" } },
+    { t: "09:45", name: "ATELIER Morihiko（早餐）", q: "ATELIER Morihiko 札幌", move: { t: "car", min: 15 }, note: "09:30 出發；Morning set 8:00–11:00；店有4個車位", en: { name: "ATELIER Morihiko (breakfast)", note: "Leave 09:30; morning set 8:00–11:00; 4 parking spaces" } },
+    { t: "11:00", name: "Costco 札幌倉庫店", q: "コストコ 札幌倉庫店", move: { t: "car", min: 25 }, must: true, note: "免費泊車；要會員卡；留意聽日行李重量", en: { name: "Costco Sapporo", note: "Free parking; membership card needed; mind tomorrow's luggage weight" } },
+    { t: "12:00", name: "午餐：札幌鮭ラーメン 麺匠 赤松", q: "札幌鮭ラーメン麺匠 赤松", move: { t: "car", min: 5 }, must: true, dish: "鮭だし醤油／鮭だし味噌", note: "食べログ 3.53；11:30–14:45；只收現金。⚠️ 麺屋ふくじゅ 逢星期四休息", en: { name: "Lunch: Sapporo Salmon Ramen Akamatsu", dish: "Salmon-dashi shoyu / miso", note: "Tabelog 3.53; 11:30–14:45; cash only. ⚠️ Menya Fukuju is closed on Thursdays" } },
+    { t: "13:15", name: "三井 Outlet Park 札幌北廣島", q: "三井アウトレットパーク 札幌北広島", move: { t: "car", min: 15 }, must: true, note: "10:00–20:00；Nike、adidas、Under Armour、ASICS、North Face；免費泊車", en: { name: "Mitsui Outlet Park Sapporo Kitahiroshima", note: "10:00–20:00; Nike, adidas, Under Armour, ASICS, North Face; free parking" } },
+    { t: "16:30", name: "札幌站 JR Tower／Stellar Place／大丸", q: "札幌ステラプレイス", move: { t: "car", min: 40 }, note: "泊車：Stellar Place 買滿¥2,000 → 北口地下駐車場（2.2m）2小時免費；要封頂 → ヨドバシ NPC24H（2.3m，平日最多¥1,400）", en: { name: "Sapporo Station: JR Tower / Stellar Place / Daimaru", note: "Parking: spend ¥2,000 at Stellar Place → North Exit underground (2.2m) 2h free; for a cap → Yodobashi NPC24H (2.3m, weekday max ¥1,400)" } },
     { t: "17:45", name: "JR Tower 展望室 T38 夜景", q: "JRタワー展望室 T38", move: { t: "walk", min: 5 }, note: "38樓，10:00–22:00，成人 ¥740", en: { name: "JR Tower T38 night view", note: "38F, 10:00–22:00, adult ¥740" } },
     { ...toriton, t: "19:00", move: { t: "car", min: 30 } },
     { ...home, t: "21:00", move: { t: "car", min: 30 } },
@@ -247,23 +247,10 @@ function useSeedAndMigrate() {
           ["title", "intro", "en", "icon", "stops"].forEach((k) => { map[`trip/days/${a}/${k}`] = cb[k]; map[`trip/days/${b}/${k}`] = ca[k]; });
         }
       }
-      if ((meta.v || 0) < 11 && (meta.v || 0) >= 9) {
-        // v11：10/15 加赤松鮭拉麵做午餐，Outlet 推遲
-        const c11 = work.findIndex((d) => d.d === "10/15");
-        if (c11 >= 0) {
-          const st = asArray(work[c11].stops).filter((x) => !/ES ?CON|赤松/i.test(x.name || "")).map((x) => {
-            if (/Costco/i.test(x.name || "")) return { ...x, note: "10:00 開；要會員卡；留意聽日行李重量", en: { ...(x.en || {}), note: "Opens 10:00; membership card needed; mind tomorrow's luggage weight" } };
-            if (/Outlet/i.test(x.name || "")) return { ...x, t: "13:00", move: { t: "car", min: 15 } };
-            return x;
-          });
-          st.push({ t: "12:00", name: "午餐：札幌鮭ラーメン 麺匠 赤松", q: "札幌鮭ラーメン麺匠 赤松", move: { t: "car", min: 5 }, must: true, dish: "鮭だし醤油／鮭だし味噌", note: "食べログ 3.53；11:30–14:45（一、二休）；只收現金；賣晒會早收", en: { name: "Lunch: Sapporo Salmon Ramen Akamatsu", dish: "Salmon-dashi shoyu / miso", note: "Tabelog 3.53; 11:30–14:45 (closed Mon–Tue); cash only; may close early when sold out" } });
-          map[`trip/days/${c11}/stops`] = sortStops(st);
-        }
-      }
-      if ((meta.v || 0) < 10 && (meta.v || 0) >= 9) {
-        // v10：10/15 拎走 ES CON
-        const c10 = work.findIndex((d) => d.d === "10/15");
-        if (c10 >= 0) map[`trip/days/${c10}/stops`] = asArray(work[c10].stops).filter((x) => !/ES ?CON/i.test(x.name || ""));
+      if ((meta.v || 0) < 12 && (meta.v || 0) >= 9) {
+        // v12：10/15 用 Gavin 定嘅時間表
+        const c12 = work.findIndex((d) => d.d === "10/15");
+        if (c12 >= 0) map[`trip/days/${c12}/stops`] = chillDay(work[c12].stops);
       }
       if ((meta.v || 0) < 9 && (meta.v || 0) >= 8) {
         const b9 = work.findIndex((d) => d.d === "10/15");
