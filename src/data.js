@@ -158,6 +158,8 @@ export const FEAT = { kitty: "full", todo: true, stays: true };
 export const GROUP_COLORS = ["#F2A497", "#A8D3E6", "#B9DAA5", "#F6D27A", "#D8C8EA", "#F7C9D6"];
 // 自駕：幾多架車、邊個坐邊架（可以喺設定改）
 export const DRIVE = { on: true, cars: [] };
+// 管理員：可以改嘢嘅人（冇設定就係第一個人）
+export const ADMINS = [];
 export const DEFAULT_CARS = [
   { id: "c1", name: "Toyota", color: "#F2A497", people: ["Gionna", "Irene", "Hendy"] },
   { id: "c2", name: "ORIX", color: "#F6D27A", people: ["PoYan", "Choi"] },
@@ -191,7 +193,12 @@ export function applyConfig(cfg) {
   TRIP.scene = c.scene || "";
   const dv = c.drive;
   DRIVE.on = dv ? dv.on !== false : true;
-  DRIVE.cars = (dv ? arr(dv.cars) : DEFAULT_CARS).map((x, i) => ({ id: x.id || "c" + i, name: x.name || "", color: x.color || GROUP_COLORS[i % GROUP_COLORS.length], people: arr(x.people) }));
+  // 車用 id 做 key 儲（舊版係 array，兩種都讀到）
+  const rawCars = !dv ? DEFAULT_CARS : Array.isArray(dv.cars) ? dv.cars.filter(Boolean) : Object.entries(dv.cars || {}).filter(([, x]) => x).map(([id, x]) => ({ ...x, id: x.id || id }));
+  DRIVE.cars = rawCars.map((x, i) => ({ id: x.id || "car" + i, name: x.name || "", color: x.color || GROUP_COLORS[i % GROUP_COLORS.length], people: arr(x.people), order: x.order == null ? i : x.order }))
+    .sort((a, b) => a.order - b.order);
+  const ad = arr(c.admins).filter((n) => PEOPLE.includes(n));
+  ADMINS.splice(0, ADMINS.length, ...(ad.length ? ad : PEOPLE.slice(0, 1)));
   const f = c.features || {};
   FEAT.kitty = ["full", "log", "off"].includes(f.kitty) ? f.kitty : "full";
   FEAT.todo = f.todo !== false;

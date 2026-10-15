@@ -40,7 +40,7 @@ const S = {
   pinTitle: ["輸入 PIN 解鎖", "Enter PIN to unlock"], pinWrong: ["PIN 唔啱", "Wrong PIN"], clear: ["清除", "Clear"],
   // todo
   todoTitle: ["待辦清單", "To-do list"], doneOf: ["完成 {a} / {b}", "{a} of {b} done"], addItem: ["加一項…", "Add an item…"], add: ["加", "Add"],
-  loading: ["載入中…", "Loading…"], todoHint: ["清單全部人共用，邊個剔咗大家都見到。撳鉛筆可以改內容同揀俾邊組。", "Shared list — everyone sees what's ticked. Tap the pencil to edit or assign it to a group."], other: ["其他", "Other"],
+  loading: ["載入中…", "Loading…"], todoHint: ["清單全部人共用，邊個剔咗大家都見到。管理員撳「編輯」可以加、改同揀俾邊組。", "Shared list — everyone sees what's ticked. Admins tap “Edit” to add, change or assign items."], other: ["其他", "Other"],
   // stay
   stayTitle: ["住宿", "Stay"], copyAddr: ["複製地址", "Copy address"], copied: ["已複製 ✓", "Copied ✓"], navBack: ["導航去", "Navigate"],
   nearby: ["附近", "Nearby"], addStay: ["＋ 加住宿", "＋ Add stay"], editStay: ["改住宿", "Edit stay"], newStay: ["加住宿", "Add stay"],
@@ -131,6 +131,11 @@ const S = {
   editTodo: ["改項目", "Edit item"], todoText: ["內容", "Item"], forWho: ["俾邊個", "For"],
   addNear: ["＋ 加附近地方", "＋ Add nearby place"], nearName: ["地方", "Place"], nearNote: ["備註", "Note"],
   swipeHint: ["左右掃都可以轉日子", "Swipe left or right to change day"], customColor: ["自訂顏色", "Custom colour"],
+  admins: ["管理員", "Admins"], adminOne: ["管理員", "Admin"], viewOnly: ["只可以睇", "View only"],
+  viewOnlyHint: ["只有管理員可以改嘢。管理員：{x}。", "Only admins can make changes. Admins: {x}."], pickMeFirst: ["喺下面揀「我係」；如果你係管理員就會見到「編輯」。", "Pick “I am” below — admins then see “Edit”."],
+  adminHint: ["管理員先可以改行程、預訂、夾錢、清單同設定，其他人只可以睇（清單照剔得）。撳名加／減管理員；第一次改嘢要入 PIN。", "Only admins can change the plan, bookings, kitty, to-dos and settings; everyone else can view (and tick to-dos). Tap a name to add or remove an admin; the PIN is needed once per phone."],
+  lastAdmin: ["最少要有一個管理員", "There must be at least one admin"], unadminSelfQ: ["取消自己做管理員？之後要其他管理員先加得返。", "Remove yourself as admin? Another admin will have to add you back."],
+  colorTaken: ["呢隻色已經有人用咗", "This colour is already taken"],
   yourFlight: ["你嘅航班", "Your flight"], yourCar: ["你架車", "Your car"], editFlights: ["改航班", "Edit flights"],
   c_food: ["食", "Food"], c_car: ["油／泊車", "Fuel/Parking"], c_ticket: ["門票", "Tickets"], c_transport: ["交通", "Transport"], c_super: ["超市", "Groceries"], c_other: ["其他", "Other"],
 };

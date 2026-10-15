@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { TRIP, PEOPLE, GROUPS, FLIGHTS, STAY_NEAR, STAYS_SEED, DAYS, BACKUP, TODO_SEED, EDIT_PIN, PREF, FEAT, GROUP_COLORS, DRIVE, defaultConfig, applyConfig, dayList, fmtT, VAULT_TRIP, VAULT_FLIGHTS, vaultSeed } from "./data.js";
+import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { TRIP, PEOPLE, GROUPS, FLIGHTS, STAY_NEAR, STAYS_SEED, DAYS, BACKUP, TODO_SEED, EDIT_PIN, PREF, FEAT, GROUP_COLORS, DRIVE, ADMINS, defaultConfig, applyConfig, dayList, fmtT, VAULT_TRIP, VAULT_FLIGHTS, vaultSeed } from "./data.js";
 import { HeroArt, DayArt, HouseArt, PurseArt, BagArt, PlaneMini, BookingArt, CarIcon, SCENES, seasonOf } from "./art.jsx";
 import { createStore, newKey, KEY_STORE, IS_VAULT, TOKYO_LOCKED, vaultPath, lockTokyo, openTokyo, mainHref, tokyoHref } from "./store.js";
 import { LangCtx, useLang, useT, tr, pick, WEEK_EN, EN_DAYS, EN_STOPS, EN_TODO, EN_CAT, withEn } from "./i18n.js";
@@ -119,7 +119,7 @@ const MOVE = {
 const groupOf = (id) => GROUPS.find((g) => g.id === id);
 
 /* ---------------- 我係邊個（每部手機自己記） ---------------- */
-const MeCtx = createContext({ me: "", setMe: () => {}, myG: null });
+const MeCtx = createContext({ me: "", setMe: () => {}, myG: null, admin: false });
 const useMe = () => useContext(MeCtx);
 const groupOfPerson = (name) => GROUPS.find((g) => g.members.includes(name)) || null;
 
@@ -191,16 +191,38 @@ const hslHex = (h, sat, l) => {
   return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
 };
 const nthColor = (i, used = []) => GROUP_COLORS.find((c) => !used.includes(c)) || hslHex((i * 137.5) % 360, 0.62, 0.78);
-function ColorPick({ value, onChange }) {
+// 禁止標誌：顏色已經俾人揀咗
+const NoEntry = () => (
+  <svg viewBox="0 0 20 20" width="20" height="20" className="no-entry" aria-hidden="true">
+    <circle cx="10" cy="10" r="8.5" fill="#E0604A" stroke="#3E3A39" strokeWidth="1.8" />
+    <rect x="4.6" y="8.3" width="10.8" height="3.4" rx="1" fill="#FFFCF6" />
+  </svg>
+);
+const sameColor = (a, b) => String(a || "").toUpperCase() === String(b || "").toUpperCase();
+function ColorPick({ value, onChange, taken = [] }) {
   const t = useT();
-  const preset = GROUP_COLORS.includes(value);
+  const [warn, setWarn] = useState(false);
+  const isTaken = (c) => taken.some((x) => sameColor(x, c));
+  const preset = GROUP_COLORS.some((c) => sameColor(c, value));
   return (
-    <div className="swatches" role="radiogroup" aria-label={t("color")}>
-      {GROUP_COLORS.map((c) => <button key={c} type="button" role="radio" aria-checked={value === c} className={"swatch" + (value === c ? " on" : "")} style={{ background: c }} onClick={() => onChange(c)} aria-label={c} />)}
-      <label className={"swatch custom" + (preset ? "" : " on")} style={preset ? null : { background: value }} title={t("customColor")}>
-        <input type="color" value={/^#[0-9a-f]{6}$/i.test(value || "") ? value : "#F2A497"} onChange={(e) => onChange(e.target.value.toUpperCase())} aria-label={t("customColor")} />
-      </label>
-    </div>
+    <>
+      <div className="swatches" role="radiogroup" aria-label={t("color")}>
+        {GROUP_COLORS.map((c) => {
+          const used = isTaken(c) && !sameColor(value, c);
+          return (
+            <button key={c} type="button" role="radio" aria-checked={sameColor(value, c)} disabled={used} className={"swatch" + (sameColor(value, c) ? " on" : "") + (used ? " taken" : "")}
+              style={{ background: c }} onClick={() => onChange(c)} aria-label={used ? `${c}（${t("colorTaken")}）` : c} title={used ? t("colorTaken") : c}>
+              {used ? <NoEntry /> : null}
+            </button>
+          );
+        })}
+        <label className={"swatch custom" + (preset ? "" : " on")} style={preset ? null : { background: value }} title={t("customColor")}>
+          <input type="color" value={/^#[0-9a-f]{6}$/i.test(value || "") ? value : "#F2A497"} aria-label={t("customColor")}
+            onChange={(e) => { const c = e.target.value.toUpperCase(); if (isTaken(c)) { setWarn(true); return; } setWarn(false); onChange(c); }} />
+        </label>
+      </div>
+      {warn ? <p className="hint warn">{t("colorTaken")}</p> : null}
+    </>
   );
 }
 
@@ -489,12 +511,19 @@ const Chevron = ({ dir = "down", size = 14 }) => (
     <path d="M3.5 6 L8 10.5 L12.5 6" fill="none" stroke="#3E3A39" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+const CrownIcon = () => (
+  <svg viewBox="0 0 20 16" width="16" height="13" className="crown" aria-hidden="true">
+    <path d="M2 13 L1 4 L6 8 L10 2 L14 8 L19 4 L18 13 Z" fill="#F6D27A" stroke="#3E3A39" strokeWidth="1.8" strokeLinejoin="round" />
+  </svg>
+);
 const SmallPencil = () => (
   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 L5 15.5 L15.5 5 Q17 3.5 18.5 5 L19 5.5 Q20.5 7 19 8.5 L8.5 19 Z" fill="#F6D27A" stroke="#3E3A39" strokeWidth="2.4" strokeLinejoin="round" /></svg>
 );
 // variant: "wide"（頁底成條）／"pill"（標題隔離細掣）
 function EditToggle({ editing, onToggle, variant = "wide" }) {
   const t = useT();
+  const { admin } = useMe();
+  if (!admin) return null; // 唔係管理員：冇編輯掣
   return (
     <button type="button" className={"edit-toggle et-" + variant + (editing ? " on" : "")} onClick={onToggle} aria-pressed={editing}>
       {editing ? <CheckIcon /> : <PencilIcon />}
@@ -1065,14 +1094,14 @@ function Plan({ days, day, setDay, editing, onToggleEdit }) {
   const myGid = myG ? myG.id : null;
   const nn = nowNext(days, now, myGid);
   const isToday = nn && nn.di === day;
-  const nowI = isToday && nn.cur ? nn.cur._i : null;
-  const nextI = isToday && nn.next ? nn.next._i : null;
-  const [dir, setDir] = useState("");
+  const nowAt = nn && nn.cur ? nn.cur._i : null;
+  const nextAt = nn && nn.next ? nn.next._i : null;
+  const [entry, setEntry] = useState(""); // ""＝彈入；next/prev＝跳日；swipe＝掃完（唔再郁）
   const first = useRef(true);
   // 入嚟／轉日：今日就即刻跳去「而家」嗰個（唔郁動畫），其他日就返頂
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
-      const el = isToday ? document.querySelector(".tl-item.is-now") || document.querySelector(".tl-item.is-next") : null;
+      const el = isToday ? document.querySelector(".day-panel:not(.side) .tl-item.is-now") || document.querySelector(".day-panel:not(.side) .tl-item.is-next") : null;
       if (el) {
         let y = 0;
         for (let n = el; n; n = n.offsetParent) y += n.offsetTop;
@@ -1083,36 +1112,70 @@ function Plan({ days, day, setDay, editing, onToggleEdit }) {
     return () => cancelAnimationFrame(raf);
   }, [day]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 左右掃轉日子
-  const swipeRef = useRef(null);
+  // 左右掃：成版跟住手指郁，望到上／下一日，放手就滑過去
+  const zoneRef = useRef(null);
+  const trackRef = useRef(null);
   const tch = useRef(null);
-  const goDay = (d) => { if (d < 0 || d >= days.length || d === day) return; setDir(d > day ? "next" : "prev"); setDay(d); };
+  const busy = useRef(false);
+  const zoneW = () => (zoneRef.current ? zoneRef.current.clientWidth : window.innerWidth);
+  const setX = (x, anim) => {
+    const tr = trackRef.current;
+    if (!tr) return;
+    tr.style.transition = anim ? "transform .32s cubic-bezier(.22,.8,.3,1)" : "none";
+    tr.style.transform = x ? `translateX(${x}px)` : "";
+  };
+  const slide = (step) => {
+    const target = day + step;
+    if (busy.current || target < 0 || target >= days.length) return;
+    busy.current = true;
+    const tr = trackRef.current;
+    setX(-step * zoneW(), true);
+    let fired = false;
+    const finish = () => {
+      if (fired) return;
+      fired = true;
+      if (tr) tr.removeEventListener("transitionend", finish);
+      setEntry("swipe");
+      setDay(target);
+    };
+    if (tr) tr.addEventListener("transitionend", finish);
+    setTimeout(finish, 450);
+  };
+  useLayoutEffect(() => { setX(0, false); busy.current = false; }, [day]); // eslint-disable-line react-hooks/exhaustive-deps
+  const goDay = (d) => {
+    if (d < 0 || d >= days.length || d === day) return;
+    if (Math.abs(d - day) === 1) { slide(d - day); return; }
+    setEntry(d > day ? "next" : "prev");
+    setDay(d);
+  };
   const onTS = (e) => {
-    if (e.touches.length !== 1 || (e.target.closest && e.target.closest(".drag-handle, input, textarea, select"))) { tch.current = null; return; }
+    if (busy.current || e.touches.length !== 1 || (e.target.closest && e.target.closest(".drag-handle, input, textarea, select"))) { tch.current = null; return; }
     const p = e.touches[0];
-    tch.current = { x: p.clientX, y: p.clientY, lock: null, dx: 0 };
+    tch.current = { x: p.clientX, y: p.clientY, lock: null, dx: 0, vx: 0, lx: p.clientX, lt: Date.now() };
   };
   const onTM = (e) => {
     const st = tch.current;
     if (!st || e.touches.length !== 1) return;
     const p = e.touches[0];
     const dx = p.clientX - st.x, dy = p.clientY - st.y;
-    if (!st.lock && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) st.lock = Math.abs(dx) > Math.abs(dy) * 1.4 ? "x" : "y";
+    if (!st.lock && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) st.lock = Math.abs(dx) > Math.abs(dy) * 1.3 ? "x" : "y";
     if (st.lock !== "x") return;
+    const tNow = Date.now();
+    st.vx = (p.clientX - st.lx) / Math.max(1, tNow - st.lt);
+    st.lx = p.clientX;
+    st.lt = tNow;
     st.dx = dx;
-    const el = swipeRef.current;
-    if (el) {
-      const edge = (dx > 0 && day === 0) || (dx < 0 && day === days.length - 1);
-      el.style.transition = "none";
-      el.style.transform = `translateX(${dx * (edge ? 0.12 : 0.4)}px)`;
-    }
+    const edge = (dx > 0 && day === 0) || (dx < 0 && day === days.length - 1);
+    setX(edge ? dx * 0.22 : dx, false);
   };
   const onTE = () => {
     const st = tch.current;
     tch.current = null;
-    const el = swipeRef.current;
-    if (el) { el.style.transition = "transform .2s ease"; el.style.transform = ""; }
-    if (st && st.lock === "x" && Math.abs(st.dx) > 70) goDay(day + (st.dx < 0 ? 1 : -1));
+    if (!st || st.lock !== "x") return;
+    const step = st.dx < 0 ? 1 : -1;
+    const flick = Math.abs(st.dx) > 30 && Math.abs(st.vx) > 0.45 && Math.sign(st.vx) === Math.sign(st.dx);
+    if ((Math.abs(st.dx) > zoneW() * 0.22 || flick) && day + step >= 0 && day + step < days.length) slide(step);
+    else setX(0, true);
   };
 
   useEffect(() => {
@@ -1121,10 +1184,9 @@ function Plan({ days, day, setDay, editing, onToggleEdit }) {
     if (el && rail.scrollTo) rail.scrollTo({ left: el.offsetLeft - rail.clientWidth / 2 + el.clientWidth / 2, behavior: "smooth" });
   }, [day]);
 
-  const indexed = stops.map((s, idx) => ({ ...s, _i: idx }));
-  const hasGroups = indexed.some((s) => s.group);
-  const sections = useMemo(() => {
-    if (!hasGroups) return [{ key: "all", stops: indexed }];
+  // 分組：冇分組嘅一段＋每組一段
+  const sectionsOf = (indexed) => {
+    if (!indexed.some((s) => s.group)) return [{ key: "all", stops: indexed }];
     const out = [];
     const common = indexed.filter((s) => !s.group);
     if (common.length) out.push({ key: "all", stops: common });
@@ -1133,7 +1195,7 @@ function Plan({ days, day, setDay, editing, onToggleEdit }) {
       if (st.length) out.push({ key: g.id, g, stops: st });
     });
     return out;
-  }, [stops]); // eslint-disable-line react-hooks/exhaustive-deps
+  };
 
   const saveStops = (arr) => store.set(`trip/days/${day}/stops`, sortStops(arr));
 
@@ -1170,6 +1232,51 @@ function Plan({ days, day, setDay, editing, onToggleEdit }) {
     setAsk(null);
   };
 
+  // 一日嘅內容（中間嗰版可以改；兩邊嗰版只係俾你望到）
+  const dayPanel = (i, side) => {
+    const d = days[i];
+    const secs = sectionsOf(asArray(d.stops).map((s, k) => ({ ...s, _i: k })));
+    const today = nn && nn.di === i;
+    const ed = editing && !side;
+    return (
+      <>
+        <div className="card day-head">
+          <DayArt kind={d.icon} size={64} />
+          <div className="dh-body">
+            <div className="dh-date">Day {i + 1}・{d.d}（{weekday(lang, d.w)}）</div>
+            <div className="dh-title">{pick(lang, d, "title")}</div>
+            {pick(lang, d, "intro") ? <div className="dh-intro">{pick(lang, d, "intro")}</div> : null}
+          </div>
+          <div className="dh-btns">
+            <a className="share-btn" href={waUrl(dayText(lang, d, i))} target="_blank" rel="noreferrer" tabIndex={side ? -1 : undefined}>{t("shareDay")}</a>
+            {ed ? <button className="edit-btn" onClick={() => setEditor("day")}>{t("edit")}</button> : null}
+          </div>
+        </div>
+        {today ? <NowNext nn={nn} days={days} /> : null}
+        {secs.map((sec) => (
+          <div key={sec.key} className="tl-section">
+            {sec.g ? <div className={"grp-head" + (myGid === sec.g.id ? " mine" : "")} style={{ background: sec.g.color }}>{pick(lang, sec.g, "name")}・{sec.g.members.join(lang === "en" ? ", " : "、")}{pick(lang, sec.g, "dest") ? "・" + pick(lang, sec.g, "dest") : ""}{myGid === sec.g.id ? <span className="you-dot">{t("you")}</span> : null}</div> : null}
+            <Timeline stops={sec.stops} editing={ed} showGroup={sec.key === "all"} onEdit={(idx) => setEditor({ idx })} onReorder={onReorder(sec.stops)} nowI={today ? nowAt : null} nextI={today ? nextAt : null} />
+          </div>
+        ))}
+        {ed ? <button className="btn full ghost" onClick={() => setEditor({ idx: null })}>{t("addStop")}</button> : null}
+        {side ? null : (
+          <>
+            <div className="day-nav">
+              {i > 0 ? (
+                <button type="button" className="dn-btn prev" onClick={() => goDay(i - 1)}><Chevron dir="left" size={16} /><span><small>Day {i}</small>{days[i - 1].d}</span></button>
+              ) : <span />}
+              {i < days.length - 1 ? (
+                <button type="button" className="dn-btn next" onClick={() => goDay(i + 1)}><span><small>Day {i + 2}</small>{days[i + 1].d}</span><Chevron dir="right" size={16} /></button>
+              ) : <span />}
+            </div>
+            <p className="hint center swipe-hint">{t("swipeHint")}</p>
+          </>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className="page">
       <div className="day-rail" ref={railRef} role="tablist" aria-label={t("pickDate")}>
@@ -1180,39 +1287,14 @@ function Plan({ days, day, setDay, editing, onToggleEdit }) {
         ))}
       </div>
 
-      <div className="swipe-zone" ref={swipeRef} onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE} onTouchCancel={onTE}>
-      <div key={day} className={dir === "next" ? "slide-next" : dir === "prev" ? "slide-prev" : "bounce-in"}>
-        <div className="card day-head">
-          <DayArt kind={data.icon} size={64} />
-          <div className="dh-body">
-            <div className="dh-date">Day {day + 1}・{data.d}（{weekday(lang, data.w)}）</div>
-            <div className="dh-title">{pick(lang, data, "title")}</div>
-            {pick(lang, data, "intro") ? <div className="dh-intro">{pick(lang, data, "intro")}</div> : null}
+      <div className="swipe-zone" ref={zoneRef} onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE} onTouchCancel={onTE}>
+        <div className="swipe-track" ref={trackRef}>
+          <div key={day} className={"day-panel" + (entry === "swipe" ? " no-anim" : entry === "next" ? " slide-next" : entry === "prev" ? " slide-prev" : " bounce-in")}>
+            {dayPanel(day, false)}
           </div>
-          <div className="dh-btns">
-            <a className="share-btn" href={waUrl(dayText(lang, data, day))} target="_blank" rel="noreferrer">{t("shareDay")}</a>
-            {editing ? <button className="edit-btn" onClick={() => setEditor("day")}>{t("edit")}</button> : null}
-          </div>
+          {day > 0 ? <div key={"p" + (day - 1)} className="day-panel side prev no-anim" aria-hidden="true" inert="">{dayPanel(day - 1, true)}</div> : null}
+          {day < days.length - 1 ? <div key={"n" + (day + 1)} className="day-panel side next no-anim" aria-hidden="true" inert="">{dayPanel(day + 1, true)}</div> : null}
         </div>
-        {isToday ? <NowNext nn={nn} days={days} /> : null}
-
-        {sections.map((sec) => (
-          <div key={sec.key} className="tl-section">
-            {sec.g ? <div className={"grp-head" + (myGid === sec.g.id ? " mine" : "")} style={{ background: sec.g.color }}>{pick(lang, sec.g, "name")}・{sec.g.members.join(lang === "en" ? ", " : "、")}{pick(lang, sec.g, "dest") ? "・" + pick(lang, sec.g, "dest") : ""}{myGid === sec.g.id ? <span className="you-dot">{t("you")}</span> : null}</div> : null}
-            <Timeline stops={sec.stops} editing={editing} showGroup={sec.key === "all"} onEdit={(idx) => setEditor({ idx })} onReorder={onReorder(sec.stops)} nowI={nowI} nextI={nextI} />
-          </div>
-        ))}
-        {editing ? <button className="btn full ghost" onClick={() => setEditor({ idx: null })}>{t("addStop")}</button> : null}
-        <div className="day-nav">
-          {day > 0 ? (
-            <button type="button" className="dn-btn prev" onClick={() => goDay(day - 1)}><Chevron dir="left" size={16} /><span><small>Day {day}</small>{days[day - 1].d}</span></button>
-          ) : <span />}
-          {day < days.length - 1 ? (
-            <button type="button" className="dn-btn next" onClick={() => goDay(day + 1)}><span><small>Day {day + 2}</small>{days[day + 1].d}</span><Chevron dir="right" size={16} /></button>
-          ) : <span />}
-        </div>
-        <p className="hint center swipe-hint">{t("swipeHint")}</p>
-      </div>
       </div>
 
       {IS_VAULT ? null : <h2 className="sec">{t("backup")}</h2>}
@@ -1308,7 +1390,7 @@ function TodoSheet({ item, onClose }) {
     </Sheet>
   );
 }
-function Todo() {
+function Todo({ editing, onToggleEdit }) {
   const t = useT();
   const lang = useLang();
   const { myG } = useMe();
@@ -1345,6 +1427,7 @@ function Todo() {
         <Seg full label={t("forWho")} value={mineView ? "mine" : "all"} onChange={setView}
           options={[["all", t("all")], ["mine", <span key="m" className="seg-mine"><span className="mini-dot" style={{ background: myG.color }} />{pick(lang, myG, "name")}</span>]]} />
       ) : null}
+      {editing ? (<>
       <form className="add-row" onSubmit={add}>
         <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder={t("addItem")} aria-label={t("addItem")} />
         <button className="btn" type="submit">{t("add")}</button>
@@ -1357,6 +1440,7 @@ function Todo() {
         ))}
       </div>
       <div className="for-row"><span className="tools-label">{t("forWho")}</span><ForPicker value={newFor} onChange={setNewFor} /></div>
+      </>) : null}
       {raw === undefined ? <div className="card plain empty">{t("loading")}</div> : null}
       {cats.map((c) => (
         <div key={c}>
@@ -1373,7 +1457,7 @@ function Todo() {
                       {it.for ? <span className="todo-for">{it.for.split("").map((id) => groupOf(id)).filter(Boolean).map((g) => <span key={g.id} className="tag tiny" style={{ background: g.color }}>{pick(lang, g, "name")}</span>)}</span> : null}
                     </span>
                   </label>
-                  <button type="button" className="todo-edit" aria-label={t("editTodo") + " " + label(it)} onClick={() => setEd(it)}><SmallPencil /></button>
+                  {editing ? <button type="button" className="todo-edit" aria-label={t("editTodo") + " " + label(it)} onClick={() => setEd(it)}><SmallPencil /></button> : null}
                 </li>
               );
             })}
@@ -1381,7 +1465,8 @@ function Todo() {
         </div>
       ))}
       <p className="hint">{t("todoHint")}</p>
-      {ed ? <TodoSheet item={ed} onClose={() => setEd(null)} /> : null}
+      {ed && editing ? <TodoSheet item={ed} onClose={() => setEd(null)} /> : null}
+      <EditToggle editing={editing} onToggle={onToggleEdit} />
     </div>
   );
 }
@@ -1517,18 +1602,20 @@ function FlightSheet({ flight, onSave, onDelete, onClose }) {
   );
 }
 
-const driveOut = (on, cars) => ({ on, cars: cars.map((c) => ({ id: c.id, name: c.name || "", color: c.color, people: c.people || [] })) });
+// 車用 id 做 key（Firebase 唔會因為 array 次序出事）
+const driveOut = (on, cars) => ({ on, cars: Object.fromEntries(cars.map((c, i) => [c.id, { id: c.id, name: c.name || "", color: c.color, people: c.people || [], order: i }])) });
 function CarSheet({ car, idx, onSave, onDelete, onClose }) {
   const t = useT();
+  const taken = DRIVE.cars.filter((c) => !car || c.id !== car.id).map((c) => c.color);
   const [name, setName] = useState(car ? car.name : "");
-  const [color, setColor] = useState(car ? car.color : nthColor(idx, DRIVE.cars.map((c) => c.color)));
+  const [color, setColor] = useState(car ? car.color : nthColor(idx, taken));
   const [ppl, setPpl] = useState(car ? car.people : []);
   return (
     <Sheet title={car ? t("editCar") : t("newCar")} onClose={onClose}>
       <form className="form" onSubmit={(e) => { e.preventDefault(); onSave({ id: car ? car.id : uid(), name: name.trim(), color, people: ppl }); }}>
         <div className="car-preview"><CarIcon color={color} size={64} /><b>{t("carN", { n: idx + 1 })}</b></div>
         <label className="fld"><span>{t("carName")}</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <div className="fld"><span>{t("color")}</span><ColorPick value={color} onChange={setColor} /></div>
+        <div className="fld"><span>{t("color")}</span><ColorPick value={color} onChange={setColor} taken={taken} /></div>
         <div className="fld"><span>{t("whoInCar")}</span><WhoPicker value={ppl} onChange={setPpl} /></div>
         <button className="btn full" type="submit">{t("save")}</button>
         {car ? <button type="button" className="btn full ghost danger-btn" onClick={() => { if (window.confirm(t("confirmDel", { x: t("carN", { n: idx + 1 }) }))) onDelete(); }}>{t("del")}</button> : null}
@@ -1565,14 +1652,14 @@ function CarList({ editing }) {
       {free.length && cars.length ? <p className="hint">{t("unassigned", { x: free.join(lang === "en" ? ", " : "、") })}</p> : null}
       {editing ? <button className="btn ghost full" onClick={() => setEd({ i: null })}>{t("addCar")}</button> : null}
       {ed ? (
-        <CarSheet car={ed.i == null ? null : cars[ed.i]} idx={ed.i == null ? cars.length : ed.i} onClose={() => setEd(null)}
+        <CarSheet key={ed.i == null ? "new" : cars[ed.i] ? cars[ed.i].id : ed.i} car={ed.i == null ? null : cars[ed.i] || null} idx={ed.i == null ? cars.length : ed.i} onClose={() => setEd(null)}
           onSave={(car) => {
             // 一個人只可以坐一架車
             const others = cars.map((c) => (c.id === car.id ? c : { ...c, people: c.people.filter((p) => !car.people.includes(p)) }));
             write(ed.i == null ? [...others, car] : others.map((c) => (c.id === car.id ? car : c)));
             setEd(null);
           }}
-          onDelete={() => { write(cars.filter((_, j) => j !== ed.i)); setEd(null); }} />
+          onDelete={() => { const gone = cars[ed.i]; setEd(null); write(cars.filter((c, j) => (gone ? c.id !== gone.id : j !== ed.i))); }} />
       ) : null}
     </>
   );
@@ -2373,7 +2460,7 @@ function GroupsEditor({ cfg, editing }) {
             ) : <b>{pick(lang, { name: g.name, en: { name: g.en } }, "name")}</b>}
             <span className="muted small nowrap">{t("sharesN", { n: g.members.filter((m) => m.trim()).length })}</span>
           </div>
-          {editing ? <ColorPick value={g.color} onChange={(c) => upd(i, { color: c })} /> : null}
+          {editing ? <ColorPick value={g.color} onChange={(c) => upd(i, { color: c })} taken={draft.filter((_, k) => k !== i).map((x) => x.color)} /> : null}
           <div className="members">
             {g.members.map((m, j) => (
               editing ? (
@@ -2634,7 +2721,7 @@ function DriveEditor({ editing }) {
         <Seg value={DRIVE.on ? "on" : "off"} onChange={(v) => store.set("trip/config/drive", driveOut(v === "on", DRIVE.cars))} label={t("selfDrive")} options={[["on", t("yes")], ["off", t("no")]]} />
       </div>
       {DRIVE.on ? <CarList editing={editing} /> : null}
-      <p className="hint">{DRIVE.on ? t("driveHint") : t("noDriveHint")}</p>
+      {DRIVE.on ? null : <p className="hint">{t("noDriveHint")}</p>}
     </>
   );
 }
@@ -2649,20 +2736,55 @@ function MePicker() {
   );
 }
 
+function AdminEditor() {
+  const t = useT();
+  const { me } = useMe();
+  const toggle = (p) => {
+    const on = ADMINS.includes(p);
+    if (on && ADMINS.length === 1) { window.alert(t("lastAdmin")); return; }
+    if (on && p === me && !window.confirm(t("unadminSelfQ"))) return;
+    const next = on ? ADMINS.filter((x) => x !== p) : [...ADMINS, p];
+    store.set("trip/config/admins", PEOPLE.filter((x) => next.includes(x)));
+  };
+  return (
+    <>
+      <div className="chips">
+        {GROUPS.flatMap((g) => g.members.map((p) => {
+          const on = ADMINS.includes(p);
+          return (
+            <button key={p} type="button" className={"chip small person-chip admin-chip" + (on ? " on" : "")} style={{ "--accent": g.color }} aria-pressed={on} onClick={() => toggle(p)}>
+              {on ? <CrownIcon /> : null}{p}
+            </button>
+          );
+        }))}
+      </div>
+      <p className="hint">{t("adminHint")}</p>
+    </>
+  );
+}
+
 function Settings({ editing, setEditing, askUnlock, lang, setLang, h12, setH12, cfg, days, pin }) {
   const t = useT();
+  const { me, admin } = useMe();
   const forget = () => { try { localStorage.removeItem(PIN_OK); } catch (e) { /* ignore */ } setEditing(false); };
   return (
     <div className="page">
       <h1 className="title left">{t("settings")}</h1>
 
-      <section className={"card plain edit-row" + (editing ? " on" : "")}>
-        <div>
-          <b>{editing ? t("editOn") : t("editOff")}</b>
-          <p className="hint">{editing ? t("editOnHint") : t("editOffHint")}</p>
-        </div>
-        <EditToggle editing={editing} onToggle={() => (editing ? setEditing(false) : askUnlock())} variant="pill" />
-      </section>
+      {admin ? (
+        <section className={"card plain edit-row" + (editing ? " on" : "")}>
+          <div>
+            <b>{editing ? t("editOn") : t("editOff")}<span className="tag admin-tag"><CrownIcon />{t("adminOne")}</span></b>
+            <p className="hint">{editing ? t("editOnHint") : t("editOffHint")}</p>
+          </div>
+          <EditToggle editing={editing} onToggle={() => (editing ? setEditing(false) : askUnlock())} variant="pill" />
+        </section>
+      ) : (
+        <section className="card plain view-only">
+          <b>{t("viewOnly")}</b>
+          <p className="hint">{t("viewOnlyHint", { x: ADMINS.join(lang === "en" ? ", " : "、") })}{me ? "" : " " + t("pickMeFirst")}</p>
+        </section>
+      )}
 
       <SetCard title={t("display")}>
         <div className="set-row"><span>{t("language")}</span><Seg value={lang} onChange={setLang} label={t("language")} options={[["zh", "中文"], ["en", "English"]]} /></div>
@@ -2697,6 +2819,10 @@ function Settings({ editing, setEditing, askUnlock, lang, setLang, h12, setH12, 
             <GroupsEditor cfg={cfg} editing={editing} />
           </SetCard>
 
+          <SetCard title={t("admins")}>
+            <AdminEditor />
+          </SetCard>
+
           <SetCard title={t("security")}>
             {IS_VAULT ? <p className="hint">{t("vaultHint")}</p> : <PrivateLink editing={editing} />}
             {IS_VAULT ? null : (
@@ -2708,12 +2834,12 @@ function Settings({ editing, setEditing, askUnlock, lang, setLang, h12, setH12, 
             )}
           </SetCard>
         </>
-      ) : (
+      ) : admin ? (
         <button type="button" className="card plain locked-card" onClick={askUnlock}>
           <LockIcon open={false} />
           <span>{t("lockedSettings")}</span>
         </button>
-      )}
+      ) : null}
 
       <SetCard title={t("exportImport")}>
         <ExportBox editing={editing} />
@@ -2764,7 +2890,9 @@ function App() {
   applyConfig(cfg || defaultConfig());
   if (IS_VAULT && !(cfg && cfg.drive)) { DRIVE.on = false; DRIVE.cars = []; }
   const myG = groupOfPerson(me);
-  const meVal = useMemo(() => ({ me: myG ? me : "", setMe, myG }), [me, myG && myG.id, myG && myG.color, myG && myG.members.join()]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 管理員先可以改嘢；呢部手機要入過一次 PIN（東京私人行程本身已經有密碼）
+  const admin = !!myG && ADMINS.includes(me);
+  const meVal = useMemo(() => ({ me: myG ? me : "", setMe, myG, admin }), [me, admin, myG && myG.id, myG && myG.color, myG && myG.members.join()]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => store.onDenied(() => setDenied(true)), []);
   const remoteDays = useShared("trip/days");
   const days = asArray(remoteDays).length ? asArray(remoteDays) : withEn(DAYS);
@@ -2778,11 +2906,12 @@ function App() {
 
   // 編輯：呢部手機入過一次 PIN 就記住，之後撳「編輯／完成」切換
   const remembered = () => { try { return localStorage.getItem(PIN_OK) === pin; } catch (e) { return false; } };
-  const startEdit = () => { if (IS_VAULT || remembered()) setEditing(true); else setPinOpen(true); };
+  const canEdit = editing && admin && (IS_VAULT || remembered());
+  const startEdit = () => { if (!admin) return; if (IS_VAULT || remembered()) setEditing(true); else setPinOpen(true); };
   const askUnlock = startEdit;
   const pinOk = () => { try { localStorage.setItem(PIN_OK, pin); } catch (e) { /* ignore */ } setEditing(true); setPinOpen(false); };
   const goPlan = (i) => { setDay(i); setTab("plan"); };
-  const toggleEdit = () => (editing ? setEditing(false) : startEdit());
+  const toggleEdit = () => (canEdit ? setEditing(false) : startEdit());
 
   return (
     <LangCtx.Provider value={lang}>
@@ -2793,11 +2922,11 @@ function App() {
         <main className={IS_VAULT ? "with-vault" : ""}>
           {denied ? <DeniedScreen /> : null}
           {!denied && tab === "home" && <Home goPlan={goPlan} setTab={setTab} days={days} status={status} />}
-          {!denied && tab === "plan" && <Plan days={days} day={day < days.length ? day : 0} setDay={setDay} editing={editing} onToggleEdit={toggleEdit} />}
-          {!denied && tab === "todo" && <Todo />}
-          {!denied && tab === "stay" && <Stay editing={editing} onToggleEdit={toggleEdit} />}
-          {!denied && tab === "money" && <Money editing={editing} askUnlock={askUnlock} goSettings={() => setTab("settings")} onToggleEdit={toggleEdit} />}
-          {!denied && tab === "settings" && <Settings editing={editing} setEditing={setEditing} askUnlock={askUnlock} lang={lang} setLang={setLang} h12={h12} setH12={setH12} cfg={cfg} days={days} pin={pin} />}
+          {!denied && tab === "plan" && <Plan days={days} day={day < days.length ? day : 0} setDay={setDay} editing={canEdit} onToggleEdit={toggleEdit} />}
+          {!denied && tab === "todo" && <Todo editing={canEdit} onToggleEdit={toggleEdit} />}
+          {!denied && tab === "stay" && <Stay editing={canEdit} onToggleEdit={toggleEdit} />}
+          {!denied && tab === "money" && <Money editing={canEdit} askUnlock={askUnlock} goSettings={() => setTab("settings")} onToggleEdit={toggleEdit} />}
+          {!denied && tab === "settings" && <Settings editing={canEdit} setEditing={setEditing} askUnlock={askUnlock} lang={lang} setLang={setLang} h12={h12} setH12={setH12} cfg={cfg} days={days} pin={pin} />}
         </main>
 
         {pinOpen ? <PinSheet pin={pin} onOk={pinOk} onClose={() => setPinOpen(false)} /> : null}

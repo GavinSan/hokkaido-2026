@@ -759,6 +759,26 @@ main { padding-bottom: 48px; }
 
 .app.en .nav-btn { font-size: 13px; letter-spacing: -.3px; padding-left: 0; padding-right: 0; overflow: hidden; }
 
+/* ---------- v9：行程左右掃（望到隔離日） ---------- */
+.swipe-zone { position: relative; overflow: hidden; margin: -6px -16px -10px; padding: 6px 16px 10px; touch-action: pan-y; }
+.swipe-track { position: relative; }
+.day-panel > .nownext { margin-top: 14px; }
+.day-panel.side { position: absolute; top: 0; width: 100%; pointer-events: none; }
+.day-panel.side.next { left: calc(100% + 32px); }
+.day-panel.side.prev { right: calc(100% + 32px); }
+.no-anim .tl-item { animation: none !important; }
+/* 顏色已經有人揀 */
+.swatch { position: relative; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.swatch.taken { cursor: not-allowed; opacity: .9; }
+.swatch .no-entry { display: block; }
+.hint.warn { color: #C4584A; font-weight: 700; margin: 0; }
+/* 管理員 */
+.crown { display: inline-block; vertical-align: -1px; margin-right: 3px; }
+.admin-tag { margin-left: 8px; background: var(--yellow); display: inline-flex; align-items: center; font-size: 11.5px; vertical-align: 2px; }
+.view-only { display: grid; gap: 2px; border-style: dashed; box-shadow: none; }
+.view-only .hint { margin: 0; }
+.admin-chip { display: inline-flex; align-items: center; }
+
 /* 「減少動態效果」：全部停晒 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
