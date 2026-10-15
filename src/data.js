@@ -33,6 +33,7 @@ export const STAY_NEAR = [
 // 住宿會寫入 Firebase，之後喺 app 改
 export const STAYS_SEED = {
   s1: { order: 1, name: "札幌住宿（全程）", addr: "〒062-0901 北海道札幌市豊平区豊平1条7丁目2-7", dates: "10/10 → 10/16 10:00 退房", who: "全部7人",
+        near: [{ name: "Lawson 豊平1条店", note: "最近便利店，行1分鐘", q: "Lawson 豊平1条店 豊平1条8丁目2-5", en: { note: "Nearest convenience store, 1 min walk" } }],
         en: { name: "Sapporo apartment (whole trip)", dates: "10/10 → 10/16, check out 10:00", who: "All 7" } },
   s2: { order: 2, name: "C組第二間酒店", addr: "", dates: "10/16 → 10/17", who: "PoYan、Choi",
         en: { name: "Group C second hotel", dates: "10/16 → 10/17", who: "PoYan, Choi" } },
@@ -155,6 +156,13 @@ export const PREF = { h12: false }; // 每部手機自己嘅顯示設定
 // 功能開關（可以喺設定改）：kitty = full（公數袋）／log（只記支出）／off
 export const FEAT = { kitty: "full", todo: true, stays: true };
 export const GROUP_COLORS = ["#F2A497", "#A8D3E6", "#B9DAA5", "#F6D27A", "#D8C8EA", "#F7C9D6"];
+// 自駕：幾多架車、邊個坐邊架（可以喺設定改）
+export const DRIVE = { on: true, cars: [] };
+export const DEFAULT_CARS = [
+  { id: "c1", name: "Toyota", color: "#F2A497", people: ["Gionna", "Irene", "Hendy"] },
+  { id: "c2", name: "ORIX", color: "#F6D27A", people: ["PoYan", "Choi"] },
+];
+const arr = (v) => (Array.isArray(v) ? v.filter(Boolean) : v && typeof v === "object" ? Object.values(v).filter(Boolean) : []);
 const DEFAULT_GROUPS = GROUPS.map((g) => ({ ...g, members: [...g.members] }));
 export const defaultConfig = () => ({
   start: TRIP.startDate,
@@ -180,6 +188,10 @@ export function applyConfig(cfg) {
   if (c.depart) TRIP.departISO = c.depart;
   const fl = Array.isArray(c.flights) ? c.flights : c.flights && typeof c.flights === "object" ? Object.values(c.flights) : null;
   if (fl) FLIGHTS.splice(0, FLIGHTS.length, ...fl.filter(Boolean));
+  TRIP.scene = c.scene || "";
+  const dv = c.drive;
+  DRIVE.on = dv ? dv.on !== false : true;
+  DRIVE.cars = (dv ? arr(dv.cars) : DEFAULT_CARS).map((x, i) => ({ id: x.id || "c" + i, name: x.name || "", color: x.color || GROUP_COLORS[i % GROUP_COLORS.length], people: arr(x.people) }));
   const f = c.features || {};
   FEAT.kitty = ["full", "log", "off"].includes(f.kitty) ? f.kitty : "full";
   FEAT.todo = f.todo !== false;
@@ -214,6 +226,7 @@ export function vaultSeed(now) {
     "trip/config": {
       start: "2026-10-16", nDays: 3,
       groups: { A: { name: "我哋", en: "Us", color: "#F2A497", members: ["Gavin", "Athena"], order: 0 } },
+      scene: "tokyo", drive: { on: false, cars: [] },
     },
     "trip/days": [
       { d: "10/16", w: "五", icon: "plane", title: "札幌 → 東京", intro: "NH50 07:30 新千歲 → 09:05 羽田",

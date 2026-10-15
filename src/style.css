@@ -599,11 +599,6 @@ button.exp-ghead { width: 100%; border: 2px solid var(--ink); border-radius: 14p
 .fold-in { animation: drop-down .3s ease both; }
 
 /* ---------- v6：編輯掣、下一站、航班動畫、東京 ---------- */
-.edit-fab { position: fixed; right: max(16px, calc(50vw - 264px)); bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 60;
-  border: var(--line); border-radius: 999px; background: var(--paper); padding: 7px 14px; font-weight: 700; font-size: 15px; box-shadow: 2px 2px 0 var(--ink); opacity: .95; }
-.edit-fab.on { background: var(--yellow); }
-.edit-fab:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
-main { padding-bottom: 90px; }
 .tl-item.is-next .tl-card { border-style: solid; background: #EAF4F8; }
 .edit-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .edit-row .hint { margin: 2px 0 0; }
@@ -647,6 +642,122 @@ main { padding-bottom: 90px; }
 .payer-icon svg { display: block; }
 .vault-banner svg { vertical-align: -3px; margin-right: 2px; }
 main { padding-bottom: 48px; }
+
+
+/* ---------- v8 ---------- */
+/* 航班：飛機由左飛到右，停喺條路入面先淡出（唔會俾邊界食咗） */
+.fly-path { overflow: hidden; height: 26px; }
+.fly-plane, .fb-plane { animation: fly-across2 6.5s ease-in-out infinite; }
+@keyframes fly-across2 {
+  0% { transform: translate(-22px, 3px) rotate(-8deg); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translate(calc(50% - 20px), -3px) rotate(0deg); }
+  86% { transform: translate(calc(100% - 40px), 2px) rotate(6deg); opacity: 1; }
+  100% { transform: translate(calc(100% - 40px), 2px) rotate(6deg); opacity: 0; }
+}
+.flight-no { display: inline-flex; align-items: center; gap: 6px; }
+.flight.mine { background: #FFF8E6; }
+.flight-who { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.you-tag { background: var(--ink); color: var(--paper); border-color: var(--ink); font-size: 11.5px; margin-left: 6px; vertical-align: 2px; }
+.flight-no .you-tag { margin-left: 0; }
+
+/* 揀人／顏色 */
+.who-pick { display: grid; gap: 8px; }
+.who-pick .hint { margin: 0; }
+.grp-chip.on, .person-chip.on { background: var(--accent); box-shadow: 2px 2px 0 var(--ink); }
+.grp-chip.part { background: linear-gradient(90deg, var(--accent) 50%, var(--paper) 50%); }
+.swatches { flex-wrap: wrap; }
+.swatch.custom { position: relative; overflow: hidden; background: conic-gradient(#F2A497, #F6D27A, #B9DAA5, #A8D3E6, #D8C8EA, #F7C9D6, #F2A497); }
+.swatch.custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.swatch.custom:not(.on)::after { content: "+"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; pointer-events: none; }
+
+/* 箭咀 */
+.chev-svg { display: block; transition: transform .22s ease; }
+.chev-svg.up { transform: rotate(180deg); }
+.chev-svg.right { transform: rotate(-90deg); }
+.chev-svg.left { transform: rotate(90deg); }
+.exp-ghead .gh-left { gap: 6px; }
+
+/* 我係邊個 */
+.me-card { display: grid; gap: 8px; background: #FFF8E6; border-style: dashed; }
+.me-q { display: flex; justify-content: space-between; align-items: baseline; }
+.me-card .hint { margin: 0; }
+.grp-head.mine { box-shadow: 2px 2px 0 var(--ink); }
+.you-dot { margin-left: 8px; background: var(--ink); color: var(--paper); border-radius: 999px; padding: 0 8px; font-size: 12px; }
+
+/* 行程：左右掃 */
+.swipe-zone { touch-action: pan-y; }
+.slide-next { animation: slide-next .32s cubic-bezier(.2,.9,.3,1) both; }
+.slide-prev { animation: slide-prev .32s cubic-bezier(.2,.9,.3,1) both; }
+@keyframes slide-next { from { opacity: 0; transform: translateX(46px); } to { opacity: 1; transform: none; } }
+@keyframes slide-prev { from { opacity: 0; transform: translateX(-46px); } to { opacity: 1; transform: none; } }
+.day-nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; }
+.dn-btn { display: inline-flex; align-items: center; gap: 6px; border: 2px solid var(--ink); border-radius: 999px; background: var(--paper); padding: 5px 14px; font-weight: 700; font-size: 15px; box-shadow: 2px 2px 0 var(--ink); }
+.dn-btn:active { transform: translate(2px, 2px); box-shadow: none; }
+.dn-btn span { display: grid; line-height: 1.15; text-align: left; }
+.dn-btn.next span { text-align: right; }
+.dn-btn small { font-size: 11.5px; color: var(--muted); font-weight: 700; }
+.swipe-hint { margin-top: 8px; }
+
+/* 清單 */
+.todo-edit { border: 2px solid var(--ink); border-radius: 50%; background: var(--paper); width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 0; }
+.todo-edit:active { background: var(--yellow); }
+.todo-for { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: 1px; text-decoration: none; }
+.todo.mine { background: #FFF8E6; }
+.todo.done.mine { background: #EEF6E8; }
+.for-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: -4px; }
+.seg-mine { display: inline-flex; align-items: center; }
+
+/* 預訂 */
+.stay.mine { background: #FFF8E6; }
+.stay-top .tl-name { display: flex; align-items: center; flex-wrap: wrap; }
+.near-list { margin-top: 10px; border-top: 2px dashed var(--ink); padding-top: 8px; display: grid; gap: 6px; }
+.near-title { font-size: 13px; font-weight: 700; color: var(--muted); }
+.near-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.near-txt { display: grid; line-height: 1.3; min-width: 0; }
+.near-txt small { color: var(--muted); font-size: 12.5px; }
+.near-map { border: 2px solid var(--ink); border-radius: 999px; padding: 1px 12px; font-size: 13px; font-weight: 700; text-decoration: none; flex: 0 0 auto; background: var(--paper); }
+.near-edit { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; align-items: center; }
+.near-edit .input { padding: 7px 10px; font-size: 15px; }
+.add-near { justify-self: start; }
+.car-list { display: grid; gap: 10px; }
+.car-card { display: flex; align-items: center; gap: 12px; border-left-width: 10px; border-left-color: var(--accent); }
+.car-card.mine { background: #FFF8E6; }
+.car-body { flex: 1; min-width: 0; }
+.car-name { font-weight: 700; font-size: 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+.car-icon { display: block; flex: 0 0 auto; overflow: visible; }
+.car-preview { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px; background: #EAF4F8; border-radius: 16px; border: 2px solid var(--ink); }
+
+/* 設定 */
+.locked-card { display: flex; gap: 12px; align-items: center; text-align: left; width: 100%; border-style: dashed; box-shadow: none; font-size: 14px; font-weight: 700; }
+.locked-card svg { flex: 0 0 auto; }
+.scene-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.scene-opt { border: 2px solid var(--ink); border-radius: 14px; background: var(--paper); padding: 4px 4px 2px; display: grid; gap: 2px; font-weight: 700; font-size: 13px; overflow: hidden; }
+.scene-opt .hero-svg { border-radius: 9px; border: 1.5px solid var(--ink); }
+.scene-opt.on { background: var(--yellow); box-shadow: 2px 2px 0 var(--ink); }
+.still, .still * { animation: none !important; }
+
+/* 支出：排序掣 */
+.exp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.exp-head .sec { margin: 0; }
+.sort-btns { display: flex; gap: 6px; position: relative; }
+.sort-btn { display: inline-flex; align-items: center; justify-content: center; gap: 1px; height: 34px; min-width: 48px; border: 2px solid var(--ink); border-radius: 999px; background: var(--paper); padding: 0 8px; }
+.sort-btn svg { display: block; }
+.sort-btn.on { background: var(--yellow); box-shadow: 2px 2px 0 var(--ink); }
+.sort-btn.fold { min-width: 36px; padding: 0; }
+.sort-btn:disabled { opacity: .35; }
+.sort-btn:active { transform: translate(1px, 1px); }
+.sort-arrow { transition: transform .25s ease, opacity .2s; }
+.sort-arrow.up { transform: rotate(180deg); }
+.sort-arrow.off { opacity: .28; }
+.sort-tip { position: absolute; right: 0; top: calc(100% + 6px); background: var(--ink); color: var(--paper); font-size: 12.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; pointer-events: none; z-index: 5; animation: tip-in 1.4s ease both; }
+@keyframes tip-in { 0% { opacity: 0; transform: translateY(-4px); } 12% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+/* 雪 */
+.snow { animation: snowfall 6.5s linear infinite; }
+@keyframes snowfall { 0% { transform: translate(0, -12px); opacity: 0; } 10% { opacity: 1; } 100% { transform: translate(16px, 215px); opacity: .9; } }
+
+.app.en .nav-btn { font-size: 13px; letter-spacing: -.3px; padding-left: 0; padding-right: 0; overflow: hidden; }
 
 /* 「減少動態效果」：全部停晒 */
 @media (prefers-reduced-motion: reduce) {

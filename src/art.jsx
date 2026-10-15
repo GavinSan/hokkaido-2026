@@ -29,73 +29,312 @@ function Tree({ x, y, fill }) {
   );
 }
 
-/* ---------- 首頁大插圖：羊蹄山、時計台、楓樹、自駕車 ---------- */
-export function HeroArt() {
+/* ---------- 首頁大插圖：地方 × 季節 × 幾多架車 ---------- */
+const SEASONS = {
+  spring: { sky: "#BFE2F0", grass: "#C6E3B0", far: "#D8EDCB", mount: "#B9DAA5", trees: ["#F7C9D6", "#FBE0E8"], sun: YELLOW, road: PAPER, sand: "#F4E2B4" },
+  summer: { sky: "#9ED4EC", grass: "#A5D58A", far: "#C3E4AE", mount: "#9CCB7E", trees: ["#7DB866", "#A9D68F"], sun: YELLOW, road: PAPER, sand: "#F4E2B4" },
+  autumn: { sky: MIZU, grass: GREEN, far: "#CFE5C1", mount: GREEN, trees: [CORAL, YELLOW], sun: YELLOW, road: PAPER, sand: "#F1DFB3" },
+  winter: { sky: "#CFE2EC", grass: "#F7F5F0", far: "#E6EEF2", mount: "#EEF3F5", trees: ["#F4F7F8", "#E3EDF1"], sun: "#FBE7B5", road: "#E4DFD8", sand: "#EFE7D6" },
+};
+export const SCENES = ["hokkaido", "tokyo", "kyoto", "beach", "camp"];
+export function seasonOf(dateStr) {
+  const m = Number(String(dateStr || "").slice(5, 7)) || 10;
+  return m >= 3 && m <= 5 ? "spring" : m >= 6 && m <= 8 ? "summer" : m >= 9 && m <= 11 ? "autumn" : "winter";
+}
+const reduced = () => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
+
+function Pine({ x, y, fill, snow }) {
   return (
-    <svg viewBox="0 0 360 230" className="hero-svg" role="img" aria-label="北海道秋天插圖：雪山、札幌時計台、紅葉同兩架車">
-      <rect x="0" y="0" width="360" height="230" fill={MIZU} />
-      <g className="spin-slow" style={{ transformOrigin: "300px 46px" }}>
-        {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
-          <path key={a} d="M300 18 V10" {...S} transform={`rotate(${a} 300 46)`} />
+    <g transform={`translate(${x} ${y})`}>
+      <path d="M0 8 V24" {...S} />
+      <g className="sway" style={{ transformOrigin: "0px 24px" }}>
+        <path d="M-15 12 L0 -12 L15 12 Z" fill={fill} {...S} />
+        <path d="M-11 -2 L0 -24 L11 -2 Z" fill={fill} {...S} />
+        {snow ? <path d="M-5 -16 L0 -24 L5 -16 Z" fill={PAPER} stroke={INK} strokeWidth="2" strokeLinejoin="round" /> : null}
+      </g>
+    </g>
+  );
+}
+function Palm({ x, y }) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <path d="M0 24 Q-5 6 2 -14" fill="none" stroke={INK} strokeWidth="8" strokeLinecap="round" />
+      <path d="M0 24 Q-5 6 2 -14" fill="none" stroke="#C99A6A" strokeWidth="4" strokeLinecap="round" />
+      <g className="sway" style={{ transformOrigin: "2px -14px" }}>
+        {[-150, -100, -40, 10, 60].map((r) => (
+          <path key={r} d="M0 0 Q12 -9 24 -2 Q12 -3 0 0 Z" transform={`translate(2 -14) rotate(${r})`} fill="#7DB866" stroke={INK} strokeWidth="2" strokeLinejoin="round" />
         ))}
+        <circle cx="0" cy="-11" r="3" fill="#B0835A" stroke={INK} strokeWidth="1.5" />
+        <circle cx="5" cy="-11" r="3" fill="#B0835A" stroke={INK} strokeWidth="1.5" />
       </g>
-      <circle cx="300" cy="46" r="18" fill={YELLOW} {...S} />
-
-      <g className="drift">
-        <path d="M40 52 a12 12 0 0 1 22 -6 a14 14 0 0 1 26 4 a10 10 0 0 1 2 20 h-48 a10 10 0 0 1 -2 -18 z" fill={PAPER} {...S} />
-      </g>
-      <g className="drift drift-2">
-        <path d="M170 34 a9 9 0 0 1 16 -4 a11 11 0 0 1 20 3 a8 8 0 0 1 1 15 h-36 a8 8 0 0 1 -1 -14 z" fill={PAPER} {...S} />
-      </g>
-
-      {/* 羊蹄山 */}
-      <path d="M-10 160 L95 62 L200 160 Z" fill={GREEN} {...S} />
-      <path d="M72 84 L95 62 L118 84 L108 80 L100 88 L92 80 L84 88 Z" fill={PAPER} {...S} />
-      <path d="M140 160 L210 100 L290 160 Z" fill="#CFE5C1" {...S} />
-
-      {/* 時計台 */}
-      <g transform="translate(232 92)">
-        <rect x="0" y="34" width="78" height="44" fill={PAPER} {...S} />
-        <path d="M-6 36 L39 14 L84 36 Z" fill={CORAL} {...S} />
-        <rect x="27" y="-6" width="24" height="26" fill={PAPER} {...S} />
-        <path d="M23 -4 L39 -22 L55 -4 Z" fill={CORAL} {...S} />
-        <circle cx="39" cy="7" r="7" fill={YELLOW} stroke={INK} strokeWidth="2.5" />
-        <path d="M39 7 V3 M39 7 H42" stroke={INK} strokeWidth="2" strokeLinecap="round" />
-        <rect x="10" y="48" width="12" height="16" rx="2" fill={MIZU} stroke={INK} strokeWidth="2.5" />
-        <rect x="56" y="48" width="12" height="16" rx="2" fill={MIZU} stroke={INK} strokeWidth="2.5" />
-        <rect x="33" y="54" width="12" height="24" rx="2" fill={YELLOW} stroke={INK} strokeWidth="2.5" />
-      </g>
-
-      {/* 草地＋路 */}
-      <rect x="-5" y="158" width="370" height="80" fill={GREEN} {...S} />
-      <path d="M-5 186 H365 V214 H-5 Z" fill={PAPER} {...S} />
-      <path d="M10 200 H40 M70 200 H100 M130 200 H160 M190 200 H220 M250 200 H280 M310 200 H340" stroke={INK} strokeWidth="2.5" strokeLinecap="round" strokeDasharray="0" />
-
-      <Tree x={30} y={148} fill={CORAL} />
-      <Tree x={205} y={150} fill={YELLOW} />
-      <Tree x={335} y={148} fill={CORAL} />
-
-      {/* 兩架車 */}
-      <g className="bob">
-        <g transform="translate(70 166)">
-          <path d="M0 22 V12 Q2 6 10 6 L16 -4 Q18 -7 24 -7 H44 Q50 -7 53 -2 L60 6 Q68 7 68 14 V22 Z" fill={CORAL} {...S} />
-          <path d="M20 4 L25 -3 H34 V4 Z M39 4 V-3 H45 L51 4 Z" fill={MIZU} stroke={INK} strokeWidth="2.5" strokeLinejoin="round" />
-          <circle cx="16" cy="23" r="6" fill={INK} /><circle cx="16" cy="23" r="2" fill={PAPER} />
-          <circle cx="52" cy="23" r="6" fill={INK} /><circle cx="52" cy="23" r="2" fill={PAPER} />
+    </g>
+  );
+}
+function ClockTower() {
+  return (
+    <g transform="translate(232 92)">
+      <rect x="0" y="34" width="78" height="44" fill={PAPER} {...S} />
+      <path d="M-6 36 L39 14 L84 36 Z" fill={CORAL} {...S} />
+      <rect x="27" y="-6" width="24" height="26" fill={PAPER} {...S} />
+      <path d="M23 -4 L39 -22 L55 -4 Z" fill={CORAL} {...S} />
+      <circle cx="39" cy="7" r="7" fill={YELLOW} stroke={INK} strokeWidth="2.5" />
+      <path d="M39 7 V3 M39 7 H42" stroke={INK} strokeWidth="2" strokeLinecap="round" />
+      <rect x="10" y="48" width="12" height="16" rx="2" fill={MIZU} stroke={INK} strokeWidth="2.5" />
+      <rect x="56" y="48" width="12" height="16" rx="2" fill={MIZU} stroke={INK} strokeWidth="2.5" />
+      <rect x="33" y="54" width="12" height="24" rx="2" fill={YELLOW} stroke={INK} strokeWidth="2.5" />
+    </g>
+  );
+}
+const TOWER = "#EE7B57";
+function TokyoTower() {
+  return (
+    <g transform="translate(238 0)">
+      <path d="M0 22 V36" {...S} />
+      <path d="M-30 162 Q-12 112 -7 66 H7 Q12 112 30 162 H17 Q0 132 -17 162 Z" fill={TOWER} {...S} />
+      <path d="M-7 66 L-4 36 H4 L7 66 Z" fill={TOWER} {...S} />
+      <rect x="-17" y="92" width="34" height="9" rx="2" fill={PAPER} {...S} />
+      <rect x="-8" y="50" width="16" height="7" rx="2" fill={PAPER} stroke={INK} strokeWidth="2.4" />
+      <path d="M-12 120 H12 M-20 142 H20" stroke={PAPER} strokeWidth="4" />
+      <g className="glow"><circle cx="0" cy="22" r="3" fill={CORAL} stroke={INK} strokeWidth="1.8" /></g>
+    </g>
+  );
+}
+function Skyline() {
+  const B = [[4, 112, 36, 50, PAPER], [44, 90, 30, 72, "#D6EAF2"], [78, 122, 26, 40, "#F4EFE8"], [108, 102, 40, 60, PAPER], [154, 118, 30, 44, "#D6EAF2"], [296, 98, 34, 64, "#F4EFE8"], [334, 120, 30, 42, PAPER]];
+  return (
+    <g>
+      {B.map(([x, y, w, h, f], i) => (
+        <g key={i}>
+          <rect x={x} y={y} width={w} height={h} fill={f} {...S} />
+          {Array.from({ length: Math.floor((h - 14) / 12) }).map((_, r) => Array.from({ length: Math.floor((w - 6) / 10) }).map((__, c) => (
+            <rect key={r + "-" + c} x={x + 6 + c * 10} y={y + 7 + r * 12} width="4.5" height="6" rx="1" fill={(r + c + i) % 3 ? MIZU : YELLOW} stroke={INK} strokeWidth="1.1" />
+          )))}
         </g>
-      </g>
-      <g className="bob bob-2">
-        <g transform="translate(150 166)">
-          <path d="M0 22 V12 Q2 6 10 6 L16 -4 Q18 -7 24 -7 H44 Q50 -7 53 -2 L60 6 Q68 7 68 14 V22 Z" fill={YELLOW} {...S} />
-          <path d="M20 4 L25 -3 H34 V4 Z M39 4 V-3 H45 L51 4 Z" fill={MIZU} stroke={INK} strokeWidth="2.5" strokeLinejoin="round" />
-          <circle cx="16" cy="23" r="6" fill={INK} /><circle cx="16" cy="23" r="2" fill={PAPER} />
-          <circle cx="52" cy="23" r="6" fill={INK} /><circle cx="52" cy="23" r="2" fill={PAPER} />
-        </g>
-      </g>
+      ))}
+    </g>
+  );
+}
+function Pagoda() {
+  const cx = 246, roof = "#6E7F86";
+  const tiers = [0, 1, 2, 3, 4].map((i) => ({ w: 34 - i * 4, bottom: 150 - i * 20 }));
+  return (
+    <g>
+      <rect x={cx - 30} y="150" width="60" height="12" fill="#E8DFD5" {...S} />
+      {tiers.map(({ w, bottom }, i) => {
+        const top = bottom - 12, r = w / 2 + 11;
+        return (
+          <g key={i}>
+            <rect x={cx - w / 2} y={top} width={w} height="12" fill={i % 2 ? PAPER : CORAL} stroke={INK} strokeWidth="2.4" />
+            <path d={`M${cx - r} ${top + 1} Q${cx - r + 6} ${top - 3} ${cx - r + 11} ${top - 8} H${cx + r - 11} Q${cx + r - 6} ${top - 3} ${cx + r} ${top + 1} Z`} fill={roof} stroke={INK} strokeWidth="2.4" strokeLinejoin="round" />
+          </g>
+        );
+      })}
+      <path d={`M${cx} 50 V26`} {...S} />
+      <path d={`M${cx - 4} 34 H${cx + 4} M${cx - 4} 41 H${cx + 4}`} stroke={INK} strokeWidth="2.2" strokeLinecap="round" />
+    </g>
+  );
+}
+function Torii({ cx }) {
+  const red = "#E0604A";
+  return (
+    <g>
+      <rect x={cx - 21} y="118" width="6" height="44" fill={red} stroke={INK} strokeWidth="2.4" />
+      <rect x={cx + 15} y="118" width="6" height="44" fill={red} stroke={INK} strokeWidth="2.4" />
+      <rect x={cx - 26} y="124" width="52" height="5" fill={red} stroke={INK} strokeWidth="2.2" />
+      <path d={`M${cx - 34} 112 Q${cx} 118 ${cx + 34} 112 L${cx + 32} 118 Q${cx} 123 ${cx - 32} 118 Z`} fill={red} stroke={INK} strokeWidth="2.4" strokeLinejoin="round" />
+    </g>
+  );
+}
+function Lighthouse() {
+  return (
+    <g transform="translate(-42 0)">
+      <path d="M258 160 Q266 136 290 134 Q314 136 322 160 Z" fill="#BDB4AA" {...S} />
+      <path d="M281 136 L284 84 H296 L299 136 Z" fill={PAPER} {...S} />
+      <path d="M282.6 110 L283.4 98 H296.6 L297.4 110 Z M281.6 128 L282.2 120 H297.8 L298.4 128 Z" fill={CORAL} stroke={INK} strokeWidth="2" strokeLinejoin="round" />
+      <g className="glow"><rect x="283" y="72" width="14" height="12" rx="2" fill={YELLOW} stroke={INK} strokeWidth="2.4" /></g>
+      <path d="M280 73 L290 62 L300 73 Z" fill={CORAL} {...S} />
+    </g>
+  );
+}
 
-      <Leaf x={120} y={40} fill={CORAL} cls="fall" delay="0s" />
-      <Leaf x={250} y={20} fill={YELLOW} cls="fall" delay="2.2s" />
-      <Leaf x={60} y={10} fill={CORAL} cls="fall" delay="4s" />
+function CarShape({ color, n }) {
+  return (
+    <>
+      <path d="M0 22 V12 Q2 6 10 6 L16 -4 Q18 -7 24 -7 H44 Q50 -7 53 -2 L60 6 Q68 7 68 14 V22 Z" fill={color} {...S} />
+      <path d="M20 4 L25 -3 H34 V4 Z M39 4 V-3 H45 L51 4 Z" fill={MIZU} stroke={INK} strokeWidth="2.5" strokeLinejoin="round" />
+      {n ? <><circle cx="34" cy="14" r="6" fill={PAPER} stroke={INK} strokeWidth="1.8" /><text x="34" y="17.3" textAnchor="middle" fontSize="9" fontWeight="700" fill={INK} fontFamily="Huninn, sans-serif">{n}</text></> : null}
+      <circle cx="16" cy="23" r="6" fill={INK} /><circle cx="16" cy="23" r="2" fill={PAPER} />
+      <circle cx="52" cy="23" r="6" fill={INK} /><circle cx="52" cy="23" r="2" fill={PAPER} />
+    </>
+  );
+}
+// 細車仔（清單用）
+export function CarIcon({ color = CORAL, size = 34 }) {
+  return (
+    <svg viewBox="-3 -10 74 40" width={size} height={size * 40 / 74} aria-hidden="true" className="car-icon"><CarShape color={color} /></svg>
+  );
+}
+
+function Cars({ cars, still }) {
+  const n = cars.length;
+  if (!n) return null;
+  const GAP = 82;
+  if (n <= 3) {
+    const W = n * 68 + (n - 1) * 14;
+    const x0 = n === 2 ? 70 : (360 - W) / 2;
+    return cars.map((c, i) => (
+      <g key={i} className={"bob" + (i % 2 ? " bob-2" : "")}>
+        <g transform={`translate(${x0 + i * GAP} 166)`}><CarShape color={c.color} n={n > 1 ? i + 1 : 0} /></g>
+      </g>
+    ));
+  }
+  const W = n * GAP - 14;
+  if (still) {
+    const k = Math.min(1, 344 / W);
+    return (
+      <g transform={`matrix(${k} 0 0 ${k} ${(360 - W * k) / 2} ${195 * (1 - k)})`}>
+        {cars.map((c, i) => <g key={i} transform={`translate(${i * GAP} 166)`}><CarShape color={c.color} n={i + 1} /></g>)}
+      </g>
+    );
+  }
+  // 太多架：成隊車慢慢駛過
+  const P = Math.max(W + 50, 380);
+  const convoy = (off) => cars.map((c, i) => (
+    <g key={off + "-" + i} className={"bob" + (i % 2 ? " bob-2" : "")}><g transform={`translate(${off + i * GAP} 166)`}><CarShape color={c.color} n={i + 1} /></g></g>
+  ));
+  return (
+    <g>
+      <animateTransform attributeName="transform" type="translate" from="0 0" to={`${P} 0`} dur={`${(P / 38).toFixed(1)}s`} repeatCount="indefinite" />
+      {convoy(0)}{convoy(-P)}
+    </g>
+  );
+}
+function Train({ still }) {
+  const car = (x, front) => (
+    <g key={x} transform={`translate(${x} 0)`}>
+      <path d={front ? "M0 174 H50 Q62 174 64 188 V200 H0 Z" : "M0 174 H60 V200 H0 Z"} fill={front ? CORAL : YELLOW} {...S} />
+      <rect x="8" y="179" width="12" height="9" rx="2" fill={MIZU} stroke={INK} strokeWidth="2.2" />
+      <rect x="26" y="179" width="12" height="9" rx="2" fill={MIZU} stroke={INK} strokeWidth="2.2" />
+      {front ? <path d="M46 179 H54 Q58 180 59 188 H46 Z" fill={MIZU} stroke={INK} strokeWidth="2.2" strokeLinejoin="round" /> : <rect x="44" y="179" width="10" height="9" rx="2" fill={MIZU} stroke={INK} strokeWidth="2.2" />}
+      <circle cx="14" cy="202" r="4.5" fill={INK} /><circle cx="46" cy="202" r="4.5" fill={INK} />
+    </g>
+  );
+  const body = <g className="bob">{car(0)}{car(66)}{car(132, true)}</g>;
+  if (still) return <g transform="translate(92 0)">{body}</g>;
+  return (
+    <g>
+      <animateTransform attributeName="transform" type="translate" from="-210 0" to="380 0" dur="11s" repeatCount="indefinite" />
+      {body}
+    </g>
+  );
+}
+
+const SCENE_ALT = { hokkaido: "北海道：雪山同時計台", tokyo: "東京：高樓同東京鐵塔", kyoto: "京都：五重塔同鳥居", beach: "海邊：燈塔同椰樹", camp: "山野：雪山、湖同帳篷" };
+const SEASON_ALT = { spring: "春天櫻花", summer: "夏天", autumn: "秋天紅葉", winter: "冬天落雪" };
+
+export function HeroArt({ scene = "hokkaido", season = "autumn", cars = [], drive = true, still: stillProp = false, className = "" }) {
+  const P = SEASONS[season] || SEASONS.autumn;
+  const still = stillProp || reduced();
+  const treeAt = [[30, 148], [205, 150], [335, 148]];
+  const ground = scene === "beach" ? P.sand : P.grass;
+  const winter = season === "winter";
+  return (
+    <svg viewBox="0 0 360 230" className={"hero-svg " + className + (stillProp ? " still" : "")} role="img" aria-label={`${SCENE_ALT[scene] || ""}・${SEASON_ALT[season] || ""}・${drive ? `${cars.length} 架車` : "火車"}`}>
+      <rect x="0" y="0" width="360" height="230" fill={P.sky} />
+      <g className="spin-slow" style={{ transformOrigin: "300px 46px" }}>
+        {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => <path key={a} d="M300 18 V10" {...S} transform={`rotate(${a} 300 46)`} />)}
+      </g>
+      <circle cx="300" cy="46" r={season === "summer" ? 21 : 18} fill={P.sun} {...S} />
+      <g className="drift"><path d="M40 52 a12 12 0 0 1 22 -6 a14 14 0 0 1 26 4 a10 10 0 0 1 2 20 h-48 a10 10 0 0 1 -2 -18 z" fill={PAPER} {...S} /></g>
+      <g className="drift drift-2"><path d="M170 34 a9 9 0 0 1 16 -4 a11 11 0 0 1 20 3 a8 8 0 0 1 1 15 h-36 a8 8 0 0 1 -1 -14 z" fill={PAPER} {...S} /></g>
+      {season === "summer" && !still ? (
+        <g className="drift drift-2" fill="none" stroke={INK} strokeWidth="2.2" strokeLinecap="round">
+          <path d="M228 70 q4 -5 8 0 q4 -5 8 0" /><path d="M250 58 q3 -4 6 0 q3 -4 6 0" />
+        </g>
+      ) : null}
+
+      {/* 背景 */}
+      {scene === "hokkaido" ? (
+        <g>
+          <path d="M-10 160 L95 62 L200 160 Z" fill={P.mount} {...S} />
+          <path d="M72 84 L95 62 L118 84 L108 80 L100 88 L92 80 L84 88 Z" fill={PAPER} {...S} />
+          <path d="M140 160 L210 100 L290 160 Z" fill={P.far} {...S} />
+          <ClockTower />
+        </g>
+      ) : scene === "tokyo" ? (
+        <g><Skyline /><TokyoTower /></g>
+      ) : scene === "kyoto" ? (
+        <g>
+          <path d="M-10 162 Q60 92 130 138 Q190 98 250 128 Q320 96 370 136 V162 Z" fill={P.far} {...S} />
+          <Pagoda />
+          <Torii cx={140} />
+        </g>
+      ) : scene === "beach" ? (
+        <g>
+          <path d="M-5 116 H365 V164 H-5 Z" fill="#86C8E2" {...S} />
+          <path d="M14 117 Q44 92 78 117 Z" fill={P.mount} {...S} />
+          <g className="wave" fill="none" stroke={INK} strokeWidth="2.2" strokeLinecap="round">
+            <path d="M100 132 q6 -5 12 0 t12 0 M170 146 q6 -5 12 0 t12 0 M40 144 q6 -5 12 0 t12 0" />
+          </g>
+          <Lighthouse />
+        </g>
+      ) : (
+        <g>
+          <path d="M-10 160 L70 70 L150 160 Z" fill={P.mount} {...S} />
+          <path d="M52 90 L70 70 L88 90 L80 87 L74 93 L66 87 L60 92 Z" fill={PAPER} {...S} />
+          <path d="M110 160 L205 82 L300 160 Z" fill={P.far} {...S} />
+          <path d="M186 98 L205 82 L224 98 L214 95 L205 101 L196 95 Z" fill={PAPER} {...S} />
+          <path d="M240 160 L305 104 L370 160 Z" fill={P.mount} {...S} />
+        </g>
+      )}
+
+      {/* 地面＋路 */}
+      <rect x="-5" y="158" width="370" height="80" fill={ground} {...S} />
+      {scene === "camp" ? (
+        <g>
+          <ellipse cx="272" cy="171" rx="46" ry="8" fill="#8FCBE3" stroke={INK} strokeWidth="2.6" />
+          <path d="M126 180 L150 142 L174 180 Z" fill={CORAL} {...S} />
+          <path d="M150 142 L143 180 H157 Z" fill={YELLOW} stroke={INK} strokeWidth="2.4" strokeLinejoin="round" />
+        </g>
+      ) : null}
+      {drive ? (
+        <>
+          <path d="M-5 186 H365 V214 H-5 Z" fill={P.road} {...S} />
+          <path d="M10 200 H40 M70 200 H100 M130 200 H160 M190 200 H220 M250 200 H280 M310 200 H340" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <path d="M-5 203 H365 M-5 211 H365" stroke={INK} strokeWidth="3" />
+          <path d="M6 199 V215 M26 199 V215 M46 199 V215 M66 199 V215 M86 199 V215 M106 199 V215 M126 199 V215 M146 199 V215 M166 199 V215 M186 199 V215 M206 199 V215 M226 199 V215 M246 199 V215 M266 199 V215 M286 199 V215 M306 199 V215 M326 199 V215 M346 199 V215" stroke={INK} strokeWidth="2.2" strokeLinecap="round" />
+        </>
+      )}
+
+      {treeAt.map(([x, y], i) => {
+        const f = P.trees[i % 2];
+        if (scene === "beach") return i === 1 ? null : <Palm key={i} x={x} y={y} />;
+        if (scene === "camp") return <Pine key={i} x={i === 1 ? 104 : x} y={y} fill={winter ? P.trees[0] : i % 2 ? "#7DB866" : "#5E9E58"} snow={winter} />;
+        if (scene === "kyoto" && i === 1) return <Tree key={i} x={196} y={y} fill={f} />;
+        return <Tree key={i} x={x} y={y} fill={f} />;
+      })}
+
+      {drive ? <Cars cars={cars} still={still} /> : <Train still={still} />}
+
+      {/* 季節效果 */}
+      {stillProp ? null : season === "autumn" ? (
+        <>
+          <Leaf x={120} y={40} fill={CORAL} cls="fall" delay="0s" />
+          <Leaf x={250} y={20} fill={YELLOW} cls="fall" delay="2.2s" />
+          <Leaf x={60} y={10} fill={CORAL} cls="fall" delay="4s" />
+        </>
+      ) : season === "spring" ? (
+        [[90, 30, "0s"], [210, 12, "1.6s"], [40, 20, "3.1s"], [300, 70, "4.4s"], [160, 4, "5.6s"]].map(([x, y, d], i) => (
+          <g key={i} transform={`translate(${x} ${y})`}><g className="fall" style={{ animationDelay: d }}><ellipse cx="0" cy="0" rx="5" ry="3.2" fill="#F7C9D6" stroke={INK} strokeWidth="1.5" /></g></g>
+        ))
+      ) : season === "winter" ? (
+        [[30, 10, "0s"], [90, 30, "1.2s"], [150, 0, "2.6s"], [210, 24, ".6s"], [270, 8, "3.4s"], [330, 30, "1.9s"], [60, 60, "4.1s"], [240, 50, "4.8s"], [180, 70, "2.1s"]].map(([x, y, d], i) => (
+          <g key={i} transform={`translate(${x} ${y})`}><g className="snow" style={{ animationDelay: d }}><circle cx="0" cy="0" r="3.2" fill="#fff" stroke={INK} strokeWidth="1.3" /></g></g>
+        ))
+      ) : null}
     </svg>
   );
 }
@@ -221,6 +460,26 @@ export function HouseArt() {
       <rect x="32" y="56" width="13" height="13" rx="2" fill={MIZU} stroke={INK} strokeWidth="2.5" />
       <rect x="76" y="56" width="13" height="13" rx="2" fill={MIZU} stroke={INK} strokeWidth="2.5" />
       <path d="M4 84 H116" {...S} />
+    </svg>
+  );
+}
+
+/* ---------- 預訂：小屋＋機票 ---------- */
+export function BookingArt() {
+  return (
+    <svg viewBox="0 0 120 90" className="side-art" aria-hidden="true">
+      <rect x="10" y="44" width="56" height="38" fill={PAPER} {...S} />
+      <path d="M2 48 L38 18 L74 48 Z" fill={CORAL} {...S} />
+      <rect x="31" y="58" width="13" height="24" rx="2" fill={YELLOW} stroke={INK} strokeWidth="2.5" />
+      <rect x="15" y="55" width="11" height="11" rx="2" fill={MIZU} stroke={INK} strokeWidth="2.5" />
+      <g className="sway" style={{ transformOrigin: "92px 80px" }}>
+        <g transform="rotate(-10 92 60)">
+          <path d="M66 42 H118 V52 a5 5 0 0 0 0 10 V72 H66 V62 a5 5 0 0 0 0 -10 Z" fill={MIZU} {...S} />
+          <path d="M100 44 V70" stroke={INK} strokeWidth="2" strokeDasharray="3 3" />
+          <g transform="translate(84 57) rotate(90) scale(.9)"><path d="M0 -8 Q2 -8 2 -4 V-1 L8 3 V5 L2 3 V6 L4 8 V9 L0 8 L-4 9 V8 L-2 6 V3 L-8 5 V3 L-2 -1 V-4 Q-2 -8 0 -8 Z" fill={CORAL} stroke={INK} strokeWidth="1.8" strokeLinejoin="round" /></g>
+        </g>
+      </g>
+      <path d="M2 84 H118" {...S} />
     </svg>
   );
 }

@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { TRIP, PEOPLE, GROUPS, FLIGHTS, STAY_NEAR, STAYS_SEED, DAYS, BACKUP, TODO_SEED, EDIT_PIN, PREF, FEAT, GROUP_COLORS, defaultConfig, applyConfig, dayList, fmtT, VAULT_TRIP, VAULT_FLIGHTS, vaultSeed } from "./data.js";
-import { HeroArt, DayArt, HouseArt, PurseArt, BagArt, PlaneMini } from "./art.jsx";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { TRIP, PEOPLE, GROUPS, FLIGHTS, STAY_NEAR, STAYS_SEED, DAYS, BACKUP, TODO_SEED, EDIT_PIN, PREF, FEAT, GROUP_COLORS, DRIVE, defaultConfig, applyConfig, dayList, fmtT, VAULT_TRIP, VAULT_FLIGHTS, vaultSeed } from "./data.js";
+import { HeroArt, DayArt, HouseArt, PurseArt, BagArt, PlaneMini, BookingArt, CarIcon, SCENES, seasonOf } from "./art.jsx";
 import { createStore, newKey, KEY_STORE, IS_VAULT, TOKYO_LOCKED, vaultPath, lockTokyo, openTokyo, mainHref, tokyoHref } from "./store.js";
 import { LangCtx, useLang, useT, tr, pick, WEEK_EN, EN_DAYS, EN_STOPS, EN_TODO, EN_CAT, withEn } from "./i18n.js";
 
@@ -11,7 +11,7 @@ if (IS_VAULT) {
   FLIGHTS.splice(0, FLIGHTS.length, ...VAULT_FLIGHTS);
 }
 const PIN_OK = "hok-pin-ok";
-const SCHEMA_V = 12;
+const SCHEMA_V = 13;
 
 // v7：登別併入 10/14 大圈；10/15 改做札幌 chill day
 function loopDay(old) {
@@ -118,13 +118,100 @@ const MOVE = {
 };
 const groupOf = (id) => GROUPS.find((g) => g.id === id);
 
+/* ---------------- 我係邊個（每部手機自己記） ---------------- */
+const MeCtx = createContext({ me: "", setMe: () => {}, myG: null });
+const useMe = () => useContext(MeCtx);
+const groupOfPerson = (name) => GROUPS.find((g) => g.members.includes(name)) || null;
+
+/* ---------------- 人名／分組 ---------------- */
+// 舊資料得 who 文字：由入面搵返啲人名
+function peopleOf(x) {
+  if (!x) return [];
+  if (x.people) return asArray(x.people);
+  const w = String(x.who || "");
+  if (!w) return [];
+  if (/全部|All|Everyone/i.test(w)) return [...PEOPLE];
+  return PEOPLE.filter((p) => w.includes(p));
+}
+function whoLabel(lang, people) {
+  const set = new Set(people);
+  const L = lang === "en";
+  const names = PEOPLE.filter((p) => set.has(p));
+  if (!names.length) return "";
+  if (names.length === PEOPLE.length) return L ? `All ${PEOPLE.length}` : `全部${PEOPLE.length}人`;
+  const full = GROUPS.filter((g) => g.members.length && g.members.every((m) => set.has(m)));
+  const sep = L ? ", " : "、";
+  if (full.length && full.reduce((n, g) => n + g.members.length, 0) === names.length) {
+    return `${full.map((g) => pick(lang, g, "name")).join(L ? " + " : "＋")}${L ? " · " : "｜"}${names.join(sep)}`;
+  }
+  return names.join(sep);
+}
+const whoText = (lang, x) => (x && x.people ? whoLabel(lang, asArray(x.people)) : pick(lang, x, "who"));
+// 揀人：撳組名揀成組，撳名揀個別
+function WhoPicker({ value, onChange }) {
+  const t = useT();
+  const lang = useLang();
+  const set = new Set(value || []);
+  const emit = (s2) => onChange(PEOPLE.filter((p) => s2.has(p)));
+  const all = PEOPLE.length > 0 && PEOPLE.every((p) => set.has(p));
+  const togGroup = (g) => {
+    const s2 = new Set(set);
+    const full = g.members.every((m) => s2.has(m));
+    g.members.forEach((m) => (full ? s2.delete(m) : s2.add(m)));
+    emit(s2);
+  };
+  const togPerson = (p) => { const s2 = new Set(set); if (s2.has(p)) s2.delete(p); else s2.add(p); emit(s2); };
+  return (
+    <div className="who-pick">
+      <div className="chips">
+        <button type="button" className={"chip small" + (all ? " on" : "")} aria-pressed={all} onClick={() => emit(all ? new Set() : new Set(PEOPLE))}>{t("everyone")}</button>
+        {GROUPS.map((g) => {
+          const n = g.members.filter((m) => set.has(m)).length;
+          const st = n && n === g.members.length ? " on" : n ? " part" : "";
+          return (
+            <button type="button" key={g.id} className={"chip small grp-chip" + st} style={{ "--accent": g.color }} aria-pressed={!!st} onClick={() => togGroup(g)}>
+              <span className="mini-dot" style={{ background: g.color }} />{pick(lang, g, "name")}
+            </button>
+          );
+        })}
+      </div>
+      <div className="chips">
+        {GROUPS.flatMap((g) => g.members.map((p) => (
+          <button type="button" key={p} className={"chip small person-chip" + (set.has(p) ? " on" : "")} style={{ "--accent": g.color }} aria-pressed={set.has(p)} onClick={() => togPerson(p)}>{p}</button>
+        )))}
+      </div>
+      <p className="hint">{t("pickWho")}</p>
+    </div>
+  );
+}
+// 顏色：預設 6 隻＋自訂
+const hslHex = (h, sat, l) => {
+  const a = sat * Math.min(l, 1 - l);
+  const f = (n) => { const k = (n + h / 30) % 12; const c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); return Math.round(c * 255).toString(16).padStart(2, "0"); };
+  return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
+};
+const nthColor = (i, used = []) => GROUP_COLORS.find((c) => !used.includes(c)) || hslHex((i * 137.5) % 360, 0.62, 0.78);
+function ColorPick({ value, onChange }) {
+  const t = useT();
+  const preset = GROUP_COLORS.includes(value);
+  return (
+    <div className="swatches" role="radiogroup" aria-label={t("color")}>
+      {GROUP_COLORS.map((c) => <button key={c} type="button" role="radio" aria-checked={value === c} className={"swatch" + (value === c ? " on" : "")} style={{ background: c }} onClick={() => onChange(c)} aria-label={c} />)}
+      <label className={"swatch custom" + (preset ? "" : " on")} style={preset ? null : { background: value }} title={t("customColor")}>
+        <input type="color" value={/^#[0-9a-f]{6}$/i.test(value || "") ? value : "#F2A497"} onChange={(e) => onChange(e.target.value.toUpperCase())} aria-label={t("customColor")} />
+      </label>
+    </div>
+  );
+}
+
 // 今日：而家做緊邊樣、下一站係邊
-function nowNext(days, now) {
+// gid：知道自己係邊組就只計自己組＋全部人嘅行程
+function nowNext(days, now, gid) {
   const di = tripDayIndex(now);
   if (di < 0 || !days[di]) return null;
   const jst = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
   const m = jst.getHours() * 60 + jst.getMinutes();
-  const stops = asArray(days[di].stops).map((s, i) => ({ ...s, _i: i })).sort((a, b) => String(a.t).localeCompare(String(b.t)));
+  const stops = asArray(days[di].stops).map((s, i) => ({ ...s, _i: i })).filter((s) => !gid || !s.group || s.group.includes(gid)).sort((a, b) => String(a.t).localeCompare(String(b.t)));
   let cur = null, next = null;
   stops.forEach((s) => { if (toMin(s.t) <= m) cur = s; else if (!next) next = s; });
   return { di, m, cur, next, mins: next ? toMin(next.t) - m : 0 };
@@ -135,21 +222,28 @@ function fmtMins(lang, n) {
   return lang === "en" ? `${h}h${r ? " " + r + "m" : ""}` : `${h} 小時${r ? " " + r + " 分" : ""}`;
 }
 
-// WhatsApp 分享文字：名、地址、Google Maps
+// WhatsApp 分享文字：粗體＋emoji、地址、Google Maps
+const SEASON_EMOJI = { spring: "🌸", summer: "☀️", autumn: "🍁", winter: "❄️" };
 function stopText(lang, s) {
-  const lines = [`${fmtT(s.t)} ${pick(lang, s, "name")}`];
-  if (s.addr) lines.push(`📍 ${s.addr}`);
+  const lines = [`📍 *${pick(lang, s, "name")}*`, `🕒 ${fmtT(s.t)}`];
+  if (pick(lang, s, "dish")) lines.push(`🍽 ${tr(lang, "mustEat")}${pick(lang, s, "dish")}`);
+  if (s.addr) lines.push(`🏠 ${s.addr}`);
   lines.push(`🗺 ${mapsUrl(s.q || s.addr || s.name)}`);
   return lines.join("\n");
 }
 function dayText(lang, day, idx) {
   const w = lang === "en" ? WEEK_EN[day.w] || day.w : day.w;
-  const head = `🍁 *Day ${idx + 1}・${day.d}（${w}）${pick(lang, day, "title")}*`;
+  const head = `${SEASON_EMOJI[seasonOf(TRIP.startDate)] || "📅"} *Day ${idx + 1}・${day.d}（${w}）*\n*${pick(lang, day, "title")}*`;
+  const intro = pick(lang, day, "intro");
   const stops = sortStops(asArray(day.stops)).map((s) => {
     const g = s.group ? "【" + s.group.split("").map((id) => pick(lang, groupOf(id), "name")).join("、") + "】" : "";
-    return g + stopText(lang, s);
+    const lines = [`⏰ *${fmtT(s.t)}*　${g}${pick(lang, s, "name")}${s.must ? " ⭐" : ""}`];
+    if (pick(lang, s, "dish")) lines.push(`🍽 ${pick(lang, s, "dish")}`);
+    if (s.addr) lines.push(`🏠 ${s.addr}`);
+    lines.push(`🗺 ${mapsUrl(s.q || s.addr || s.name)}`);
+    return lines.join("\n");
   });
-  return [head, "", stops.join("\n\n")].join("\n");
+  return [head, ...(intro ? [`_${intro}_`] : []), "━━━━━━━━━━━━", stops.join("\n\n")].join("\n");
 }
 const weekday = (lang, w) => (lang === "en" ? WEEK_EN[w] || w : w);
 
@@ -222,10 +316,16 @@ function useSeedAndMigrate() {
       return;
     }
     if (IS_VAULT) {
-      if (meta && (meta.v || 0) < 101) {
+      const vv = (meta && meta.v) || 0;
+      // v102：東京用城市插圖、唔揸車
+      const v102 = { "trip/meta/v": 102, "trip/config/scene": "tokyo", "trip/config/drive": { on: false, cars: [] } };
+      if (vv < 101) {
         if (days === undefined || stays === undefined) return;
         done.current = true;
-        store.update(tokyoPlan(asArray(days), stays));
+        store.update({ ...tokyoPlan(asArray(days), stays), ...v102 });
+      } else if (vv < 102) {
+        done.current = true;
+        store.update(v102);
       } else done.current = true;
       return;
     }
@@ -304,6 +404,11 @@ function useSeedAndMigrate() {
       });
       if ((meta.v || 0) < 3) Object.entries(todo || {}).forEach(([id, it]) => { if (!it.en && EN_TODO[it.text]) map[`trip/todo/${id}/en`] = EN_TODO[it.text]; });
       if (!stays) map["trip/stays"] = STAYS_SEED;
+      if ((meta.v || 0) < 13) {
+        // v13：「附近」變成每間住宿自己嘅資料（可以改）；A組嘅待辦標返 A組
+        if (stays && stays.s1 && !stays.s1.near) map["trip/stays/s1/near"] = STAY_NEAR.map((n) => ({ name: n.name, note: n.note || "", q: `${n.name} ${n.addr || ""}`.trim(), ...(n.en ? { en: n.en } : {}) }));
+        Object.entries(todo || {}).forEach(([id, it]) => { if (it && !it.for && /^A組/.test(it.text || "")) map[`trip/todo/${id}/for`] = "A"; });
+      }
       // 公數袋 v2：舊「每人每輪」轉做「每組夾咗幾多現金」
       if (kitty && !kitty.cash && kitty.rounds) {
         GROUPS.forEach((g) => {
@@ -379,7 +484,15 @@ const TowerIcon = ({ size = 18, ink = "#3E3A39" }) => (
     <rect x="9" y="15.5" width="6" height="2" fill="#FFFCF6" stroke={ink} strokeWidth="1.4" />
   </svg>
 );
-// variant: "bar"（頁底成條）／"pill"（標題隔離細掣）
+const Chevron = ({ dir = "down", size = 14 }) => (
+  <svg viewBox="0 0 16 16" width={size} height={size} className={"chev-svg " + dir} aria-hidden="true">
+    <path d="M3.5 6 L8 10.5 L12.5 6" fill="none" stroke="#3E3A39" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const SmallPencil = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 L5 15.5 L15.5 5 Q17 3.5 18.5 5 L19 5.5 Q20.5 7 19 8.5 L8.5 19 Z" fill="#F6D27A" stroke="#3E3A39" strokeWidth="2.4" strokeLinejoin="round" /></svg>
+);
+// variant: "wide"（頁底成條）／"pill"（標題隔離細掣）
 function EditToggle({ editing, onToggle, variant = "wide" }) {
   const t = useT();
   return (
@@ -537,6 +650,8 @@ function departLine(lang) {
 function Countdown({ goPlan, days }) {
   const t = useT();
   const lang = useLang();
+  const { myG } = useMe();
+  const myGid = myG ? myG.id : null;
   const now = useNow(1000);
   const diff = new Date(TRIP.departISO) - now;
   const di = tripDayIndex(now);
@@ -555,7 +670,7 @@ function Countdown({ goPlan, days }) {
     );
   }
   if (di >= 0) {
-    return <NowNext nn={nowNext(days, now)} days={days} onOpen={() => goPlan(di)} />;
+    return <NowNext nn={nowNext(days, now, myGid)} days={days} onOpen={() => goPlan(di)} />;
   }
   if (false) {
     return (
@@ -569,18 +684,21 @@ function Countdown({ goPlan, days }) {
   return (<div className="card countdown"><div className="cd-big">{t("tripDone")}</div><div className="cd-foot">{t("tripDoneSub")}</div></div>);
 }
 
-function FlightCard({ f }) {
+function FlightCard({ f, onEdit }) {
   const lang = useLang();
+  const t = useT();
+  const { me } = useMe();
+  const mine = !!me && peopleOf(f).includes(me);
   const p = (k) => pick(lang, f, k);
   return (
-    <div className="card flight" style={{ "--accent": f.color }}>
-      <div className="flight-top"><span className="flight-no">{p("no")}</span><span className="flight-date">{p("date")}</span></div>
+    <div className={"card flight" + (mine ? " mine" : "")} style={{ "--accent": f.color }}>
+      <div className="flight-top"><span className="flight-no">{p("no")}{mine ? <span className="tag you-tag">{t("yourFlight")}</span> : null}</span><span className="flight-date">{p("date")}</span></div>
       <div className="flight-route">
         <div className="apt"><div className="apt-code">{f.from}</div><div className="apt-name">{p("fromName")}</div><div className="apt-time">{fmtT(p("dep"))}</div></div>
         <div className="fly-path" aria-hidden="true"><span className="fly-plane"><PlaneMini color={f.color} /></span></div>
         <div className="apt right"><div className="apt-code">{f.to}</div><div className="apt-name">{p("toName")}</div><div className="apt-time">{fmtT(f.arr)}</div></div>
       </div>
-      <div className="flight-who">{p("who")}{f.note ? <span className="muted">・{f.note}</span> : null}</div>
+      <div className="flight-who"><span>{whoText(lang, f)}{p("note") ? <span className="muted">・{p("note")}</span> : null}</span>{onEdit ? <button className="edit-btn small" onClick={onEdit}>{t("edit")}</button> : null}</div>
     </div>
   );
 }
@@ -594,20 +712,39 @@ function LangSwitch({ lang, setLang }) {
   );
 }
 
+const sceneNow = () => (SCENES.includes(TRIP.scene) ? TRIP.scene : IS_VAULT ? "tokyo" : "hokkaido");
+function MePrompt() {
+  const t = useT();
+  const { me, setMe } = useMe();
+  const [later, setLater] = usePersist("hok-me-later", false);
+  if ((me && PEOPLE.includes(me)) || later || !PEOPLE.length) return null;
+  return (
+    <div className="card plain me-card">
+      <div className="me-q"><b>{t("meQ")}</b><button className="link-btn" onClick={() => setLater(true)}>{t("later")}</button></div>
+      <div className="chips">
+        {GROUPS.flatMap((g) => g.members.map((p) => <button key={p} type="button" className="chip person-chip" style={{ "--accent": g.color }} onClick={() => setMe(p)}>{p}</button>))}
+      </div>
+      <p className="hint">{t("meHint")}</p>
+    </div>
+  );
+}
+
 function Home({ goPlan, setTab, days, status }) {
   const t = useT();
   const lang = useLang();
+  const { myG } = useMe();
   const now = useNow(30000);
   const di = tripDayIndex(now);
   const showDay = di >= 0 ? di : new Date(TRIP.departISO) > now ? 0 : -1;
-  const nn = nowNext(days, now);
+  const nn = nowNext(days, now, myG ? myG.id : null);
   const today = showDay >= 0 ? days[showDay] : null;
-  const idx = today ? asArray(today.stops).map((s, i) => ({ ...s, _i: i })).sort((a, b) => String(a.t).localeCompare(String(b.t))) : [];
+  const idx = today ? asArray(today.stops).map((s, i) => ({ ...s, _i: i })).filter((s) => !myG || !s.group || s.group.includes(myG.id)).sort((a, b) => String(a.t).localeCompare(String(b.t))) : [];
   return (
     <div className="page">
-      <div className="hero card"><HeroArt /></div>
+      <div className="hero card"><HeroArt scene={sceneNow()} season={seasonOf(TRIP.startDate)} drive={DRIVE.on} cars={DRIVE.cars} /></div>
       <h1 className="title">{lang === "en" ? TRIP.titleEn : TRIP.title}</h1>
-      <p className="subtitle">{(lang === "en" ? TRIP.subtitleEn : TRIP.subtitle) || (IS_VAULT ? t("vaultSub") : t("subtitle"))}</p>
+      <p className="subtitle">{(lang === "en" ? TRIP.subtitleEn : TRIP.subtitle) || (IS_VAULT ? t("vaultSub") : `${t("subtitle")}${lang === "en" ? " · " : "・"}${DRIVE.on && DRIVE.cars.length ? t("nPeopleCars", { p: PEOPLE.length, c: DRIVE.cars.length }) : t("nPeople", { p: PEOPLE.length })}`)}</p>
+      <MePrompt />
       {di < 0 ? <Countdown goPlan={goPlan} days={days} /> : null}
 
       {today ? (
@@ -639,10 +776,10 @@ function Home({ goPlan, setTab, days, status }) {
       </div>
 
       <div className="quick">
-        <button className="btn" onClick={() => setTab("stay")}>{t("stayInfo")}</button>
-        <button className="btn yellow" onClick={() => setTab("money")}>{t("kitty")}</button>
+        {FEAT.stays ? <button className="btn" onClick={() => setTab("stay")}>{t("stayInfo")}</button> : null}
+        {FEAT.kitty !== "off" ? <button className="btn yellow" onClick={() => setTab("money")}>{FEAT.kitty === "log" ? t("moneyLog") : t("kitty")}</button> : null}
       </div>
-      <FlightsDrawer />
+      {FEAT.stays ? null : <FlightsDrawer />}
       <p className="sync-line"><span className="sync-dot inline" style={{ background: STATUS_C[status] }} />{t("st_" + status)}{status === "online" ? t("everyoneSame") : ""}</p>
     </div>
   );
@@ -664,7 +801,7 @@ function FlightsDrawer() {
           <span className="fb-plane"><PlaneMini color="#F2A497" /></span>
         </span>
         <span className="fb-label">{t("flights")}<small>{t("flightsN", { n: FLIGHTS.length })}</small></span>
-        <span className="chev" aria-hidden="true">{open ? "▲" : "▼"}</span>
+        <span className="chev" aria-hidden="true"><Chevron dir={open ? "up" : "down"} /></span>
       </button>
       {open ? (
         <div className="flights drop-in">
@@ -924,18 +1061,59 @@ function Plan({ days, day, setDay, editing, onToggleEdit }) {
   const [editor, setEditor] = useState(null); // {idx} | "day"
   const [ask, setAsk] = useState(null);
   const now = useNow(30000);
-  const nn = nowNext(days, now);
+  const { myG } = useMe();
+  const myGid = myG ? myG.id : null;
+  const nn = nowNext(days, now, myGid);
   const isToday = nn && nn.di === day;
   const nowI = isToday && nn.cur ? nn.cur._i : null;
   const nextI = isToday && nn.next ? nn.next._i : null;
+  const [dir, setDir] = useState("");
+  const first = useRef(true);
+  // 入嚟／轉日：今日就即刻跳去「而家」嗰個（唔郁動畫），其他日就返頂
   useEffect(() => {
-    if (!isToday) return;
-    const id = setTimeout(() => {
-      const el = document.querySelector(".tl-item.is-now") || document.querySelector(".tl-item.is-next");
-      if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 650);
-    return () => clearTimeout(id);
+    const raf = requestAnimationFrame(() => {
+      const el = isToday ? document.querySelector(".tl-item.is-now") || document.querySelector(".tl-item.is-next") : null;
+      if (el) {
+        let y = 0;
+        for (let n = el; n; n = n.offsetParent) y += n.offsetTop;
+        window.scrollTo(0, Math.max(0, y - window.innerHeight / 2 + el.offsetHeight / 2));
+      } else if (!first.current) window.scrollTo(0, 0);
+      first.current = false;
+    });
+    return () => cancelAnimationFrame(raf);
   }, [day]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 左右掃轉日子
+  const swipeRef = useRef(null);
+  const tch = useRef(null);
+  const goDay = (d) => { if (d < 0 || d >= days.length || d === day) return; setDir(d > day ? "next" : "prev"); setDay(d); };
+  const onTS = (e) => {
+    if (e.touches.length !== 1 || (e.target.closest && e.target.closest(".drag-handle, input, textarea, select"))) { tch.current = null; return; }
+    const p = e.touches[0];
+    tch.current = { x: p.clientX, y: p.clientY, lock: null, dx: 0 };
+  };
+  const onTM = (e) => {
+    const st = tch.current;
+    if (!st || e.touches.length !== 1) return;
+    const p = e.touches[0];
+    const dx = p.clientX - st.x, dy = p.clientY - st.y;
+    if (!st.lock && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) st.lock = Math.abs(dx) > Math.abs(dy) * 1.4 ? "x" : "y";
+    if (st.lock !== "x") return;
+    st.dx = dx;
+    const el = swipeRef.current;
+    if (el) {
+      const edge = (dx > 0 && day === 0) || (dx < 0 && day === days.length - 1);
+      el.style.transition = "none";
+      el.style.transform = `translateX(${dx * (edge ? 0.12 : 0.4)}px)`;
+    }
+  };
+  const onTE = () => {
+    const st = tch.current;
+    tch.current = null;
+    const el = swipeRef.current;
+    if (el) { el.style.transition = "transform .2s ease"; el.style.transform = ""; }
+    if (st && st.lock === "x" && Math.abs(st.dx) > 70) goDay(day + (st.dx < 0 ? 1 : -1));
+  };
 
   useEffect(() => {
     const rail = railRef.current;
@@ -996,13 +1174,14 @@ function Plan({ days, day, setDay, editing, onToggleEdit }) {
     <div className="page">
       <div className="day-rail" ref={railRef} role="tablist" aria-label={t("pickDate")}>
         {days.map((d, i) => (
-          <button key={d.d} role="tab" aria-selected={i === day} className={"day-pill" + (i === day ? " on" : "")} onClick={() => setDay(i)}>
+          <button key={d.d} role="tab" aria-selected={i === day} className={"day-pill" + (i === day ? " on" : "")} onClick={() => goDay(i)}>
             <span className="dp-n">Day {i + 1}</span><span className="dp-d">{d.d}</span><span className="dp-w">{weekday(lang, d.w)}{i === di ? "・" + t("today") : ""}</span>
           </button>
         ))}
       </div>
 
-      <div key={day} className="bounce-in">
+      <div className="swipe-zone" ref={swipeRef} onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE} onTouchCancel={onTE}>
+      <div key={day} className={dir === "next" ? "slide-next" : dir === "prev" ? "slide-prev" : "bounce-in"}>
         <div className="card day-head">
           <DayArt kind={data.icon} size={64} />
           <div className="dh-body">
@@ -1019,11 +1198,21 @@ function Plan({ days, day, setDay, editing, onToggleEdit }) {
 
         {sections.map((sec) => (
           <div key={sec.key} className="tl-section">
-            {sec.g ? <div className="grp-head" style={{ background: sec.g.color }}>{pick(lang, sec.g, "name")}・{sec.g.members.join(lang === "en" ? ", " : "、")}・{pick(lang, sec.g, "dest")}</div> : null}
+            {sec.g ? <div className={"grp-head" + (myGid === sec.g.id ? " mine" : "")} style={{ background: sec.g.color }}>{pick(lang, sec.g, "name")}・{sec.g.members.join(lang === "en" ? ", " : "、")}{pick(lang, sec.g, "dest") ? "・" + pick(lang, sec.g, "dest") : ""}{myGid === sec.g.id ? <span className="you-dot">{t("you")}</span> : null}</div> : null}
             <Timeline stops={sec.stops} editing={editing} showGroup={sec.key === "all"} onEdit={(idx) => setEditor({ idx })} onReorder={onReorder(sec.stops)} nowI={nowI} nextI={nextI} />
           </div>
         ))}
         {editing ? <button className="btn full ghost" onClick={() => setEditor({ idx: null })}>{t("addStop")}</button> : null}
+        <div className="day-nav">
+          {day > 0 ? (
+            <button type="button" className="dn-btn prev" onClick={() => goDay(day - 1)}><Chevron dir="left" size={16} /><span><small>Day {day}</small>{days[day - 1].d}</span></button>
+          ) : <span />}
+          {day < days.length - 1 ? (
+            <button type="button" className="dn-btn next" onClick={() => goDay(day + 1)}><span><small>Day {day + 2}</small>{days[day + 1].d}</span><Chevron dir="right" size={16} /></button>
+          ) : <span />}
+        </div>
+        <p className="hint center swipe-hint">{t("swipeHint")}</p>
+      </div>
       </div>
 
       {IS_VAULT ? null : <h2 className="sec">{t("backup")}</h2>}
@@ -1066,13 +1255,72 @@ const TODO_CATS = [
   { id: "錢", color: "#B9DAA5" }, { id: "行李", color: "#D8C8EA" }, { id: "買嘢", color: "#F7C9D6" }, { id: "其他", color: "#E6DFD7" },
 ];
 const catColor = (c) => (TODO_CATS.find((x) => x.id === c) || TODO_CATS[TODO_CATS.length - 1]).color;
+// 俾邊組：""＝全部人；"AB"＝A組同B組
+function ForPicker({ value, onChange }) {
+  const t = useT();
+  const lang = useLang();
+  const v = value || "";
+  const tog = (id) => onChange((v.includes(id) ? v.replace(id, "") : v + id).split("").sort().join(""));
+  return (
+    <div className="chips">
+      <button type="button" className={"chip small" + (!v ? " on" : "")} aria-pressed={!v} onClick={() => onChange("")}>{t("everyone")}</button>
+      {GROUPS.map((g) => (
+        <button type="button" key={g.id} className={"chip small grp-chip" + (v.includes(g.id) ? " on" : "")} style={{ "--accent": g.color }} aria-pressed={v.includes(g.id)} onClick={() => tog(g.id)}>
+          <span className="mini-dot" style={{ background: g.color }} />{pick(lang, g, "name")}
+        </button>
+      ))}
+    </div>
+  );
+}
+const catLabel = (lang, c) => (lang === "en" ? EN_CAT[c] || c : c);
+function TodoSheet({ item, onClose }) {
+  const t = useT();
+  const lang = useLang();
+  const [text, setText] = useState(item.text || "");
+  const [cat, setCat] = useState(item.cat || "其他");
+  const [forG, setForG] = useState(item.for || "");
+  const save = (e) => {
+    e.preventDefault();
+    const v = text.trim();
+    if (!v) return;
+    const patch = { text: v, cat, for: forG || null };
+    if (v !== item.text) patch.en = null;
+    store.update(Object.fromEntries(Object.entries(patch).map(([k, x]) => [`trip/todo/${item.id}/${k}`, x])));
+    onClose();
+  };
+  return (
+    <Sheet title={t("editTodo")} onClose={onClose}>
+      <form className="form" onSubmit={save}>
+        <label className="fld"><span>{t("todoText")}</span><input className="input" value={text} onChange={(e) => setText(e.target.value)} required /></label>
+        <div className="fld"><span>{t("category")}</span>
+          <div className="chips">
+            {TODO_CATS.map((c) => (
+              <button type="button" key={c.id} className={"chip small" + (cat === c.id ? " on-cat" : "")} style={cat === c.id ? { background: c.color } : null} onClick={() => setCat(c.id)}>
+                <span className="mini-dot" style={{ background: c.color }} />{catLabel(lang, c.id)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="fld"><span>{t("forWho")}</span><ForPicker value={forG} onChange={setForG} /></div>
+        <button className="btn full" type="submit">{t("save")}</button>
+        <button type="button" className="btn full ghost danger-btn" onClick={() => { if (window.confirm(t("confirmDel", { x: item.text }))) { store.remove(`trip/todo/${item.id}`); onClose(); } }}>{t("del")}</button>
+      </form>
+    </Sheet>
+  );
+}
 function Todo() {
   const t = useT();
   const lang = useLang();
+  const { myG } = useMe();
   const raw = useShared("trip/todo");
-  const items = toList(raw).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  const all = toList(raw).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  const [view, setView] = usePersist("hok-todo-view", "all");
+  const mineView = view === "mine" && myG;
+  const items = mineView ? all.filter((i) => !i.for || i.for.includes(myG.id)) : all;
   const [text, setText] = useState("");
   const [newCat, setNewCat] = useState("其他");
+  const [newFor, setNewFor] = useState("");
+  const [ed, setEd] = useState(null);
   const done = items.filter((i) => i.done).length;
   const used = new Set(items.map((i) => i.cat || "其他"));
   const cats = [...TODO_CATS.map((c) => c.id).filter((c) => used.has(c)), ...[...used].filter((c) => !TODO_CATS.some((x) => x.id === c))];
@@ -1082,7 +1330,7 @@ function Todo() {
     e.preventDefault();
     const v = text.trim();
     if (!v) return;
-    store.set(`trip/todo/${uid()}`, { text: v, cat: newCat, done: false, ts: Date.now() });
+    store.set(`trip/todo/${uid()}`, { text: v, cat: newCat, done: false, ts: Date.now(), ...(newFor ? { for: newFor } : {}) });
     setText("");
   };
 
@@ -1093,6 +1341,10 @@ function Todo() {
         <div><h1 className="title left">{t("todoTitle")}</h1><p className="subtitle left">{t("doneOf", { a: done, b: items.length })}</p></div>
       </div>
       <div className="bar"><div className="bar-fill" style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }} /></div>
+      {myG ? (
+        <Seg full label={t("forWho")} value={mineView ? "mine" : "all"} onChange={setView}
+          options={[["all", t("all")], ["mine", <span key="m" className="seg-mine"><span className="mini-dot" style={{ background: myG.color }} />{pick(lang, myG, "name")}</span>]]} />
+      ) : null}
       <form className="add-row" onSubmit={add}>
         <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder={t("addItem")} aria-label={t("addItem")} />
         <button className="btn" type="submit">{t("add")}</button>
@@ -1100,48 +1352,63 @@ function Todo() {
       <div className="chips cat-pick" role="group" aria-label={t("category")}>
         {TODO_CATS.map((c) => (
           <button type="button" key={c.id} className={"chip small" + (newCat === c.id ? " on-cat" : "")} style={newCat === c.id ? { background: c.color } : null} onClick={() => setNewCat(c.id)}>
-            <span className="mini-dot" style={{ background: c.color }} />{lang === "en" ? EN_CAT[c.id] || c.id : c.id}
+            <span className="mini-dot" style={{ background: c.color }} />{catLabel(lang, c.id)}
           </button>
         ))}
       </div>
+      <div className="for-row"><span className="tools-label">{t("forWho")}</span><ForPicker value={newFor} onChange={setNewFor} /></div>
       {raw === undefined ? <div className="card plain empty">{t("loading")}</div> : null}
       {cats.map((c) => (
         <div key={c}>
-          <h2 className="cat-head" style={{ background: catColor(c) }}>{lang === "en" ? EN_CAT[c] || c : c}</h2>
+          <h2 className="cat-head" style={{ background: catColor(c) }}>{catLabel(lang, c)}</h2>
           <ul className="todo-list">
-            {items.filter((i) => (i.cat || "其他") === c).map((it) => (
-              <li key={it.id} className={"card todo" + (it.done ? " done" : "")} style={{ borderLeftColor: catColor(c) }}>
-                <label className="todo-label">
-                  <input type="checkbox" checked={!!it.done} onChange={() => store.set(`trip/todo/${it.id}/done`, !it.done)} />
-                  <span className="check" aria-hidden="true" />
-                  <span className="todo-text">{label(it)}</span>
-                </label>
-                <button className="x" aria-label={t("del") + " " + label(it)} onClick={() => { if (window.confirm(t("confirmDel", { x: label(it) }))) store.remove(`trip/todo/${it.id}`); }}>×</button>
-              </li>
-            ))}
+            {items.filter((i) => (i.cat || "其他") === c).map((it) => {
+              const mine = myG && it.for && it.for.includes(myG.id);
+              return (
+                <li key={it.id} className={"card todo" + (it.done ? " done" : "") + (mine ? " mine" : "")} style={{ borderLeftColor: catColor(c) }}>
+                  <label className="todo-label">
+                    <input type="checkbox" checked={!!it.done} onChange={() => store.set(`trip/todo/${it.id}/done`, !it.done)} />
+                    <span className="check" aria-hidden="true" />
+                    <span className="todo-text">{label(it)}
+                      {it.for ? <span className="todo-for">{it.for.split("").map((id) => groupOf(id)).filter(Boolean).map((g) => <span key={g.id} className="tag tiny" style={{ background: g.color }}>{pick(lang, g, "name")}</span>)}</span> : null}
+                    </span>
+                  </label>
+                  <button type="button" className="todo-edit" aria-label={t("editTodo") + " " + label(it)} onClick={() => setEd(it)}><SmallPencil /></button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ))}
       <p className="hint">{t("todoHint")}</p>
+      {ed ? <TodoSheet item={ed} onClose={() => setEd(null)} /> : null}
     </div>
   );
 }
 
-/* ---------------- 住宿（可以改） ---------------- */
+/* ---------------- 預訂：航班＋租車＋住宿 ---------------- */
 function StayEditor({ stay, onSave, onDelete, onClose }) {
   const t = useT();
-  const [f, setF] = useState({ name: "", addr: "", dates: "", who: "", note: "", ...stay });
+  const [f, setF] = useState({ name: "", addr: "", dates: "", note: "", ...stay });
+  const [ppl, setPpl] = useState(() => peopleOf(stay));
+  const [near, setNear] = useState(() => asArray(stay && stay.near).map((n) => ({ name: n.name || "", note: n.note || "", q: n.q || "", en: n.en || null, _n: n.name || "", _o: n.note || "" })));
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const setN = (i, k, v) => setNear(near.map((n, j) => (j === i ? { ...n, [k]: v } : n)));
   const save = (e) => {
     e.preventDefault();
     if (!f.name.trim()) return;
-    const out = { name: f.name.trim(), addr: f.addr.trim(), dates: f.dates.trim(), who: f.who.trim(), note: (f.note || "").trim(), order: f.order || Date.now() };
+    const out = { name: f.name.trim(), addr: f.addr.trim(), dates: f.dates.trim(), who: whoLabel("zh", ppl), people: ppl, note: (f.note || "").trim(), order: f.order || Date.now() };
+    out.near = near.filter((n) => n.name.trim()).map((n) => {
+      const keepName = n.name.trim() === n._n;
+      const o = { name: n.name.trim(), note: n.note.trim(), q: keepName && n.q ? n.q : n.name.trim() };
+      if (n.en && keepName && n.note === n._o) o.en = n.en;
+      return o;
+    });
     // 中文改咗就唔再用舊英文
-    if (stay && stay.en) {
-      const en = {};
-      Object.entries(stay.en).forEach(([k, v]) => { if (stay[k] === out[k]) en[k] = v; });
-      if (Object.keys(en).length) out.en = en;
-    }
+    const en = {};
+    if (stay && stay.en) Object.entries(stay.en).forEach(([k, v]) => { if (k !== "who" && stay[k] === out[k]) en[k] = v; });
+    if (ppl.length) en.who = whoLabel("en", ppl);
+    if (Object.keys(en).length) out.en = en;
     onSave(out);
   };
   return (
@@ -1150,8 +1417,18 @@ function StayEditor({ stay, onSave, onDelete, onClose }) {
         <label className="fld"><span>{t("stayName")}</span><input className="input" value={f.name} onChange={set("name")} required /></label>
         <label className="fld"><span>{t("stayAddr")}</span><textarea className="input" rows={2} value={f.addr} onChange={set("addr")} placeholder={t("stayAddrEg")} /></label>
         <label className="fld"><span>{t("stayDates")}</span><input className="input" value={f.dates} onChange={set("dates")} placeholder="10/16 → 10/17" /></label>
-        <label className="fld"><span>{t("stayWho")}</span><input className="input" value={f.who} onChange={set("who")} /></label>
+        <div className="fld"><span>{t("stayWho")}</span><WhoPicker value={ppl} onChange={setPpl} /></div>
         <label className="fld"><span>{t("note")}</span><input className="input" value={f.note || ""} onChange={set("note")} /></label>
+        <div className="fld"><span>{t("nearby")}</span>
+          {near.map((n, i) => (
+            <div key={i} className="near-edit">
+              <input className="input" value={n.name} onChange={(e) => setN(i, "name", e.target.value)} placeholder={t("nearName")} aria-label={t("nearName")} />
+              <input className="input" value={n.note} onChange={(e) => setN(i, "note", e.target.value)} placeholder={t("nearNote")} aria-label={t("nearNote")} />
+              <button type="button" className="x small" aria-label={t("del")} onClick={() => setNear(near.filter((_, j) => j !== i))}>×</button>
+            </div>
+          ))}
+          <button type="button" className="chip small dashed add-near" onClick={() => setNear([...near, { name: "", note: "", q: "", en: null, _n: "", _o: "" }])}>{t("addNear")}</button>
+        </div>
         <button className="btn full" type="submit">{t("save")}</button>
         {stay ? <button type="button" className="btn full ghost danger-btn" onClick={() => { if (window.confirm(t("confirmDel", { x: stay.name }))) onDelete(); }}>{t("del")}</button> : null}
       </form>
@@ -1162,17 +1439,20 @@ function StayEditor({ stay, onSave, onDelete, onClose }) {
 function StayCard({ s, editing, onEdit }) {
   const t = useT();
   const lang = useLang();
+  const { me } = useMe();
   const [copied, setCopied] = useState(false);
+  const mine = !!me && peopleOf(s).includes(me);
+  const near = asArray(s.near);
   const copy = async () => {
     try { await navigator.clipboard.writeText(s.addr); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) { /* ignore */ }
   };
   return (
-    <div className="card plain stay">
+    <div className={"card plain stay" + (mine ? " mine" : "")}>
       <div className="stay-top">
-        <div className="tl-name">{pick(lang, s, "name")}</div>
+        <div className="tl-name">{pick(lang, s, "name")}{mine ? <span className="tag you-tag">{t("you")}</span> : null}</div>
         {editing ? <button className="edit-btn" onClick={onEdit}>{t("edit")}</button> : null}
       </div>
-      <div className="tl-note">{[pick(lang, s, "dates"), pick(lang, s, "who")].filter(Boolean).join("・")}</div>
+      <div className="tl-note">{[pick(lang, s, "dates"), whoText(lang, s)].filter(Boolean).join("・")}</div>
       {s.addr ? <div className="addr">{s.addr}</div> : <div className="addr muted">{t("noAddr")}</div>}
       {s.note ? <div className="tl-note">{s.note}</div> : null}
       {s.addr ? (
@@ -1182,35 +1462,155 @@ function StayCard({ s, editing, onEdit }) {
           <a href={navUrl(s.addr)} target="_blank" rel="noreferrer" className="go">{t("navBack")}</a>
         </div>
       ) : null}
+      {near.length ? (
+        <div className="near-list">
+          <div className="near-title">{t("nearby")}</div>
+          {near.map((n, i) => (
+            <div key={i} className="near-row">
+              <span className="near-txt"><b>{pick(lang, n, "name")}</b>{pick(lang, n, "note") ? <small>{pick(lang, n, "note")}</small> : null}</span>
+              <a className="near-map" href={mapsUrl(n.q || n.name)} target="_blank" rel="noreferrer">{t("map")}</a>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+const FLIGHT_FIELDS = [["no", "flNo"], ["date", "flDate"], ["from", "flFrom"], ["fromName", "flFromName"], ["dep", "flDep"], ["to", "flTo"], ["toName", "flToName"], ["arr", "flArr"], ["note", "note"]];
+function FlightSheet({ flight, onSave, onDelete, onClose }) {
+  const t = useT();
+  const [f, setF] = useState(() => ({ no: "", date: "", from: "", fromName: "", dep: "", to: "", toName: "", arr: "", note: "", color: GROUP_COLORS[0], ...flight }));
+  const [ppl, setPpl] = useState(() => peopleOf(flight));
+  const save = (e) => {
+    e.preventDefault();
+    if (!String(f.no).trim()) return;
+    const out = { ...f, id: f.id || uid(), people: ppl, who: whoLabel("zh", ppl) };
+    const en = {};
+    if (flight && flight.en) Object.entries(flight.en).forEach(([k, v]) => { if (k !== "who" && flight[k] === out[k]) en[k] = v; });
+    if (ppl.length) en.who = whoLabel("en", ppl);
+    out.en = Object.keys(en).length ? en : null;
+    onSave(out);
+  };
+  // 揀咗啱啱一組：顏色跟嗰組
+  const onPeople = (v) => {
+    setPpl(v);
+    const g = GROUPS.find((x) => x.members.length === v.length && x.members.every((m) => v.includes(m)));
+    if (g) setF((o) => ({ ...o, color: g.color }));
+  };
+  return (
+    <Sheet title={flight ? t("editFlight") : t("addFlight")} onClose={onClose}>
+      <form className="form" onSubmit={save}>
+        <div className="fl-grid">
+          {FLIGHT_FIELDS.map(([k, label]) => (
+            <label key={k} className={"fld" + (["note", "date"].includes(k) ? " wide" : "")}><span>{t(label)}</span>
+              <input className="input" value={f[k] || ""} onChange={(e) => setF({ ...f, [k]: e.target.value })} required={k === "no"} />
+            </label>
+          ))}
+        </div>
+        <div className="fld"><span>{t("flWho")}</span><WhoPicker value={ppl} onChange={onPeople} /></div>
+        <div className="fld"><span>{t("color")}</span><ColorPick value={f.color} onChange={(c) => setF({ ...f, color: c })} /></div>
+        <button className="btn full" type="submit">{t("save")}</button>
+        {flight ? <button type="button" className="btn full ghost danger-btn" onClick={() => { if (window.confirm(t("confirmDel", { x: flight.no }))) onDelete(); }}>{t("del")}</button> : null}
+      </form>
+    </Sheet>
+  );
+}
+
+const driveOut = (on, cars) => ({ on, cars: cars.map((c) => ({ id: c.id, name: c.name || "", color: c.color, people: c.people || [] })) });
+function CarSheet({ car, idx, onSave, onDelete, onClose }) {
+  const t = useT();
+  const [name, setName] = useState(car ? car.name : "");
+  const [color, setColor] = useState(car ? car.color : nthColor(idx, DRIVE.cars.map((c) => c.color)));
+  const [ppl, setPpl] = useState(car ? car.people : []);
+  return (
+    <Sheet title={car ? t("editCar") : t("newCar")} onClose={onClose}>
+      <form className="form" onSubmit={(e) => { e.preventDefault(); onSave({ id: car ? car.id : uid(), name: name.trim(), color, people: ppl }); }}>
+        <div className="car-preview"><CarIcon color={color} size={64} /><b>{t("carN", { n: idx + 1 })}</b></div>
+        <label className="fld"><span>{t("carName")}</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <div className="fld"><span>{t("color")}</span><ColorPick value={color} onChange={setColor} /></div>
+        <div className="fld"><span>{t("whoInCar")}</span><WhoPicker value={ppl} onChange={setPpl} /></div>
+        <button className="btn full" type="submit">{t("save")}</button>
+        {car ? <button type="button" className="btn full ghost danger-btn" onClick={() => { if (window.confirm(t("confirmDel", { x: t("carN", { n: idx + 1 }) }))) onDelete(); }}>{t("del")}</button> : null}
+      </form>
+    </Sheet>
+  );
+}
+function CarList({ editing }) {
+  const t = useT();
+  const lang = useLang();
+  const { me } = useMe();
+  const [ed, setEd] = useState(null); // {i}
+  const cars = DRIVE.cars;
+  const taken = new Set(cars.flatMap((c) => c.people));
+  const free = PEOPLE.filter((p) => !taken.has(p));
+  const write = (list) => store.set("trip/config/drive", driveOut(true, list));
+  return (
+    <>
+      <div className="car-list">
+        {cars.map((c, i) => {
+          const mine = !!me && c.people.includes(me);
+          return (
+            <div key={c.id} className={"card plain car-card" + (mine ? " mine" : "")} style={{ "--accent": c.color }}>
+              <CarIcon color={c.color} size={50} />
+              <div className="car-body">
+                <div className="car-name">{t("carN", { n: i + 1 })}{c.name ? "・" + c.name : ""}{mine ? <span className="tag you-tag">{t("yourCar")}</span> : null}</div>
+                <div className="tl-note">{c.people.length ? whoLabel(lang, c.people) : t("noOne")}</div>
+              </div>
+              {editing ? <button className="edit-btn" onClick={() => setEd({ i })}>{t("edit")}</button> : null}
+            </div>
+          );
+        })}
+      </div>
+      {free.length && cars.length ? <p className="hint">{t("unassigned", { x: free.join(lang === "en" ? ", " : "、") })}</p> : null}
+      {editing ? <button className="btn ghost full" onClick={() => setEd({ i: null })}>{t("addCar")}</button> : null}
+      {ed ? (
+        <CarSheet car={ed.i == null ? null : cars[ed.i]} idx={ed.i == null ? cars.length : ed.i} onClose={() => setEd(null)}
+          onSave={(car) => {
+            // 一個人只可以坐一架車
+            const others = cars.map((c) => (c.id === car.id ? c : { ...c, people: c.people.filter((p) => !car.people.includes(p)) }));
+            write(ed.i == null ? [...others, car] : others.map((c) => (c.id === car.id ? car : c)));
+            setEd(null);
+          }}
+          onDelete={() => { write(cars.filter((_, j) => j !== ed.i)); setEd(null); }} />
+      ) : null}
+    </>
   );
 }
 
 function Stay({ editing, onToggleEdit }) {
   const t = useT();
-  const lang = useLang();
   const raw = useShared("trip/stays");
   const stays = toList(raw === undefined || raw === null ? STAYS_SEED : raw).sort((a, b) => (a.order || 0) - (b.order || 0));
   const [ed, setEd] = useState(null); // {id} | {id:null}
+  const [fed, setFed] = useState(null); // {i} | {i:null}
   const cur = ed && ed.id ? stays.find((x) => x.id === ed.id) : null;
+  const flights = FLIGHTS.map((f, i) => ({ ...f, id: f.id || "f" + i }));
+  const writeFlights = (arr) => store.set("trip/config/flights", arr);
 
   return (
     <div className="page">
       <div className="page-head">
-        <HouseArt />
-        <div><h1 className="title left">{t("stayTitle")}</h1><p className="subtitle left">{stays.length > 0 ? pick(lang, stays[0], "dates") : ""}</p></div>
+        <BookingArt />
+        <div><h1 className="title left">{t("bookTitle")}</h1><p className="subtitle left">{[t("flights"), DRIVE.on ? t("cars") : null, t("stayTitle")].filter(Boolean).join("・")}</p></div>
       </div>
+
+      <h2 className="sec">{t("flights")}</h2>
+      <div className="flights">
+        {flights.map((f, i) => <FlightCard key={f.id} f={f} onEdit={editing ? () => setFed({ i }) : null} />)}
+      </div>
+      {editing ? <button className="btn full ghost" onClick={() => setFed({ i: null })}>{t("addFlightBtn")}</button> : null}
+
+      {DRIVE.on ? (
+        <>
+          <h2 className="sec">{t("cars")}</h2>
+          <CarList editing={editing} />
+        </>
+      ) : null}
+
+      <h2 className="sec">{t("stayTitle")}</h2>
       {stays.map((s) => <StayCard key={s.id} s={s} editing={editing} onEdit={() => setEd({ id: s.id })} />)}
       {editing ? <button className="btn full ghost" onClick={() => setEd({ id: null })}>{t("addStay")}</button> : null}
-
-      <h2 className="sec">{t("nearby")}</h2>
-      {STAY_NEAR.map((n) => (
-        <div key={n.name} className="card plain">
-          <div className="tl-name">{n.name}</div>
-          <div className="tl-note">{n.addr}・{pick(lang, n, "note")}</div>
-          <div className="tl-links"><a href={mapsUrl(n.name + " " + n.addr)} target="_blank" rel="noreferrer">{t("map")}</a></div>
-        </div>
-      ))}
 
       {ed ? (
         <StayEditor
@@ -1219,6 +1619,11 @@ function Stay({ editing, onToggleEdit }) {
           onSave={(v) => { store.set(`trip/stays/${ed.id || uid()}`, v); setEd(null); }}
           onDelete={() => { store.remove(`trip/stays/${ed.id}`); setEd(null); }}
         />
+      ) : null}
+      {fed ? (
+        <FlightSheet flight={fed.i == null ? null : flights[fed.i]} onClose={() => setFed(null)}
+          onSave={(f) => { const arr = [...flights]; if (fed.i == null) arr.push(f); else arr[fed.i] = f; writeFlights(arr); setFed(null); }}
+          onDelete={() => { writeFlights(flights.filter((_, j) => j !== fed.i)); setFed(null); }} />
       ) : null}
       <EditToggle editing={editing} onToggle={onToggleEdit} />
     </div>
@@ -1281,6 +1686,19 @@ function computeKitty(cashList, expenses) {
   return { rows: list, cashIn, cashSpent, cardSpent, spent: cashSpent + cardSpent, left, moves };
 }
 const whoName = (lang, id) => (id === "kitty" ? tr(lang, "kittyCash") : pick(lang, groupOf(id), "name"));
+// WhatsApp 用：分類 emoji、組別顏色波波
+const CAT_EMOJI = { 食: "🍜", "油／泊車": "⛽", 住宿: "🏨", 門票: "🎟️", 交通: "🚃", 超市: "🛒", 其他: "📦" };
+function colorDot(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return "⚪";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b);
+  if (d < 0.08) return mx > 0.6 ? "⚪" : "⚫";
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h = (h * 60 + 360) % 360;
+  return h < 18 || h >= 335 ? "🔴" : h < 42 ? "🟠" : h < 70 ? "🟡" : h < 170 ? "🟢" : h < 255 ? "🔵" : "🟣";
+}
 
 // ¥ 下面細字 HK$
 function Yen({ v, rate, cls = "", sign = false }) {
@@ -1463,7 +1881,7 @@ function SpendChart({ expenses, cats, rate }) {
           <span className="ks-l">{t("whereMoney")}</span>
           <Yen v={total} rate={rate} cls="chart-total" />
         </span>
-        <span className="chev" aria-hidden="true">{open ? "▲" : "▼"}</span>
+        <span className="chev" aria-hidden="true"><Chevron dir={open ? "up" : "down"} /></span>
       </button>
       {total > 0 ? (
         <div className="stack" role="img" aria-label={cr.map((r) => `${r.label} ${pctOf(r.amt, total)}%`).join(", ")} onClick={() => setOpen(!open)}>
@@ -1520,6 +1938,32 @@ function SettleCards({ R, rate }) {
   );
 }
 
+const CalIcon = () => (
+  <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+    <rect x="2.5" y="4" width="15" height="13.5" rx="3" fill="#fff" stroke="#3E3A39" strokeWidth="2" />
+    <path d="M2.5 8.5 H17.5" stroke="#3E3A39" strokeWidth="2" />
+    <path d="M6.5 2.2 V5.6 M13.5 2.2 V5.6" stroke="#3E3A39" strokeWidth="2" strokeLinecap="round" />
+    <rect x="5.5" y="11" width="3.2" height="3" rx=".8" fill="#F2A497" />
+  </svg>
+);
+const YenIcon = () => (
+  <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+    <circle cx="10" cy="10" r="8" fill="#F6D27A" stroke="#3E3A39" strokeWidth="2" />
+    <path d="M6.6 5.4 L10 9.6 L13.4 5.4 M10 9.6 V15 M7 10.8 H13 M7 13.2 H13" fill="none" stroke="#3E3A39" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const SortArrow = ({ up, on }) => (
+  <svg viewBox="0 0 12 18" width="10" height="16" className={"sort-arrow" + (up ? " up" : "") + (on ? "" : " off")} aria-hidden="true">
+    <path d="M6 2 V15 M2 11 L6 15 L10 11" fill="none" stroke="#3E3A39" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const FoldIcon = ({ open }) => (
+  <svg viewBox="0 0 16 18" width="16" height="18" aria-hidden="true">
+    <path d={open ? "M3.5 2.5 L8 6.5 L12.5 2.5 M3.5 15.5 L8 11.5 L12.5 15.5" : "M3.5 6.5 L8 2.5 L12.5 6.5 M3.5 11.5 L8 15.5 L12.5 11.5"} fill="none" stroke="#3E3A39" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const SORTS = { new: ["date", "desc"], old: ["date", "asc"], high: ["amt", "desc"], low: ["amt", "asc"] };
+
 // 支出紀錄：按日／按分類／全部，最新喺最頂
 function ExpenseList({ expenses, editing, cats, rate, onEdit, simple }) {
   const t = useT();
@@ -1564,23 +2008,44 @@ function ExpenseList({ expenses, editing, cats, rate, onEdit, simple }) {
   const allClosed = groups.length > 0 && groups.every((g) => isClosed(g.key));
   const setAll = (v) => { const next = { ...closed }; groups.forEach((g) => { next[ck(g.key)] = v; }); setClosed(next); };
 
+  // 排序：撳日期／金額；再撳一下就倒轉。字唔郁，只係箭咀轉方向
+  const [sKey, sDir] = SORTS[sortBy] || SORTS.new;
+  const [tip, setTip] = useState("");
+  const tipT = useRef(null);
+  useEffect(() => () => clearTimeout(tipT.current), []);
+  const sortTap = (k) => {
+    const next = k === "date" ? (sKey === "date" && sortBy === "new" ? "old" : "new") : (sKey === "amt" && sortBy === "high" ? "low" : "high");
+    setSortBy(next);
+    setTip(t("tip_" + next));
+    clearTimeout(tipT.current);
+    tipT.current = setTimeout(() => setTip(""), 1400);
+  };
+
   return (
     <div className="exp-wrap">
-      <Seg full label={t("groupBy")} value={gb} onChange={setGb} options={simple ? [["day", t("byDay")], ["cat", t("byCat")], ["all", t("all")]] : [["day", t("byDay")], ["cat", t("byCat")], ["payer", t("byPayer")], ["all", t("all")]]} />
-      <div className="exp-tools">
-        <span className="tools-label">{t("sortBy")}</span>
-        <Seg label={t("sortBy")} value={sortBy} onChange={setSortBy} options={[["new", t("s_new")], ["old", t("s_old")], ["high", t("s_high")], ["low", t("s_low")]]} />
+      <div className="exp-head">
+        <h2 className="sec">{t("expenses", { n: expenses.length })}</h2>
+        <div className="sort-btns">
+          {tip ? <span key={tip} className="sort-tip" role="status">{tip}</span> : null}
+          <button type="button" className={"sort-btn" + (sKey === "date" ? " on" : "")} onClick={() => sortTap("date")} aria-label={t("sortDate") + (sKey === "date" ? "：" + t("tip_" + sortBy) : "")} title={t("sortDate")}>
+            <CalIcon /><SortArrow up={sKey === "date" && sDir === "asc"} on={sKey === "date"} />
+          </button>
+          <button type="button" className={"sort-btn" + (sKey === "amt" ? " on" : "")} onClick={() => sortTap("amt")} aria-label={t("sortAmt") + (sKey === "amt" ? "：" + t("tip_" + sortBy) : "")} title={t("sortAmt")}>
+            <YenIcon /><SortArrow up={sKey === "amt" && sDir === "asc"} on={sKey === "amt"} />
+          </button>
+          <button type="button" className="sort-btn fold" disabled={groups.length < 2} onClick={() => setAll(!allClosed)} aria-label={allClosed ? t("expandAll") : t("collapseAll")} title={allClosed ? t("expandAll") : t("collapseAll")}>
+            <FoldIcon open={!allClosed} />
+          </button>
+        </div>
       </div>
-      {groups.length > 1 ? (
-        <button type="button" className="link-btn fold-all" onClick={() => setAll(!allClosed)}>{allClosed ? t("expandAll") : t("collapseAll")}</button>
-      ) : null}
+      <Seg full label={t("groupBy")} value={gb} onChange={setGb} options={simple ? [["day", t("byDay")], ["cat", t("byCat")], ["all", t("all")]] : [["day", t("byDay")], ["cat", t("byCat")], ["payer", t("byPayer")], ["all", t("all")]]} />
       {expenses.length === 0 ? <div className="card plain empty">{t("noExp")}</div> : null}
       {groups.map((grp) => {
         const shut = isClosed(grp.key);
         return (
           <div key={grp.key} className={"exp-group" + (shut ? " shut" : "")}>
             <button type="button" className="exp-ghead" onClick={() => toggle(grp.key)} aria-expanded={!shut}>
-              <span className="gh-left"><span className={"fold-chev" + (shut ? "" : " open")} aria-hidden="true">▸</span>{grp.color ? <span className="key-dot" style={{ background: grp.color }} /> : null}{grp.title}</span>
+              <span className="gh-left"><Chevron dir={shut ? "right" : "down"} size={15} />{grp.color ? <span className="key-dot" style={{ background: grp.color }} /> : null}{grp.title}</span>
               <span className="muted">{grp.items.length}・<b>{yen(sum(grp.items))}</b></span>
             </button>
             {shut ? null : (
@@ -1654,20 +2119,33 @@ function Money({ editing, askUnlock, goSettings, onToggleEdit }) {
   const summary = () => {
     const nm = (id) => whoName(lang, id);
     const L = lang === "en";
+    const title = L ? TRIP.titleEn : TRIP.title;
+    const jst = new Date(Date.now() + (new Date().getTimezoneOffset() + 540) * 60000);
+    const stamp = `🕒 ${L ? "As of" : "截至"} ${jst.getMonth() + 1}/${jst.getDate()} ${String(jst.getHours()).padStart(2, "0")}:${String(jst.getMinutes()).padStart(2, "0")}`;
+    const line = "━━━━━━━━━━━━";
+    const byCat = {};
+    expenses.forEach((e) => { const c = catInfo(cats, e.cat).id; byCat[c] = (byCat[c] || 0) + (Number(e.amt) || 0); });
+    const catLines = Object.entries(byCat).sort((a2, b2) => b2[1] - a2[1]).map(([c, v]) => `${CAT_EMOJI[c] || "🏷️"} ${catName(lang, cats, c)}　*${yen(v)}*（${pctOf(v, R.spent)}%）`);
     if (simple) {
-      const byCat = {};
-      expenses.forEach((e) => { const c = catName(lang, cats, e.cat); byCat[c] = (byCat[c] || 0) + (Number(e.amt) || 0); });
-      return [L ? "💴 *Spending*" : "💴 *支出*", `${t("spentAll")}：${yen(R.spent)}（≈ ${hkd(R.spent, rate)}）`, "",
-        ...Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => `${c}：${yen(v)}`)].join("\n");
+      const byDay = dayList().map((d, i) => [d, i, expenses.filter((e) => (Number(e.day) || 0) === i).reduce((n, e) => n + (Number(e.amt) || 0), 0)]).filter((x) => x[2] > 0);
+      return [`💴 *${title}・${t("moneyLog")}*`, stamp, line,
+        `🧾 ${t("spentAll")}：*${yen(R.spent)}*（≈ ${hkd(R.spent, rate)}）・${t("nPayments", { n: expenses.length })}`, "",
+        `📊 *${t("whereMoney")}*`, ...catLines, "",
+        `📅 *${t("byDay")}*`, ...byDay.map(([d, i, v]) => `D${i + 1} ${d.d}：*${yen(v)}*`)].join("\n");
     }
     return [
-      L ? "💰 *Hokkaido Kitty*" : "💰 *北海道公數袋*",
-      `${t("cashLeft")}：${yen(R.left)}（≈ ${hkd(R.left, rate)}）`,
-      `${t("spentAll")}：${yen(R.spent)}（${t("byCash")} ${yen(R.cashSpent)}・${t("byCard")} ${yen(R.cardSpent)}）`,
-      "",
-      L ? "*By group*" : "*各組*",
-      ...R.rows.map((r) => `${pick(lang, r.g, "name")}（${r.shares}${L ? " shares" : "份"}）${t("cashInS")} ${yen(r.cash)}・${t("cardS")} ${yen(r.card)}・${t("oweS")} ${yen(r.owe)}・${r.bal >= 0 ? t("getBack") : t("payMore")} ${yen(Math.abs(r.bal))}`),
-      ...(R.moves.length ? ["", L ? "*To settle*" : "*點樣找數*", ...R.moves.map((m) => `${nm(m.from)} → ${nm(m.to)}：${yen(m.amt)}`)] : []),
+      `💰 *${title}・${t("kitty")}*`, stamp, line,
+      `💴 ${t("cashLeft")}：*${yen(R.left)}*（≈ ${hkd(R.left, rate)}）`,
+      `🧾 ${t("spentAll")}：*${yen(R.spent)}*（≈ ${hkd(R.spent, rate)}）`,
+      `　💵 ${t("byCash")} ${yen(R.cashSpent)}・💳 ${t("byCard")} ${yen(R.cardSpent)}`,
+      ...(catLines.length ? ["", `📊 *${t("whereMoney")}*`, ...catLines] : []),
+      "", `👥 *${L ? "By group" : "各組"}*`,
+      ...R.rows.flatMap((r) => [
+        `${colorDot(r.g.color)} *${pick(lang, r.g, "name")}*（${t("sharesN", { n: r.shares })}）`,
+        `　${t("cashInS")} ${yen(r.cash)}・${t("cardS")} ${yen(r.card)}・${t("oweS")} ${yen(r.owe)}`,
+        `　${r.bal >= 0 ? "✅ " + t("getBack") : "⚠️ " + t("payMore")} *${yen(Math.abs(r.bal))}*`,
+      ]),
+      ...(R.moves.length ? ["", `🔁 *${t("howSettle")}*`, ...R.moves.map((m) => `• ${nm(m.from)} → ${nm(m.to)}：*${yen(m.amt)}*`)] : ["", `🎉 ${t("allEven")}`]),
     ].join("\n");
   };
   const copySummary = async () => {
@@ -1746,7 +2224,6 @@ function Money({ editing, askUnlock, goSettings, onToggleEdit }) {
         </form>
       ) : null}
 
-      <h2 className="sec">{t("expenses", { n: expenses.length })}</h2>
       {kitty === undefined ? <div className="card plain empty">{t("loading")}</div> : (
         <ExpenseList expenses={expenses} editing={editing} cats={cats} rate={rate} onEdit={setEditExp} simple={simple} />
       )}
@@ -1867,7 +2344,7 @@ function GroupsEditor({ cfg, editing }) {
     const used = new Set(draft.map((g) => g.id));
     const id = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").find((c) => !used.has(c));
     if (!id) return;
-    setDraft([...draft, { id, name: `${id}組`, en: `Group ${id}`, dest: "", destEn: "", color: GROUP_COLORS[draft.length % GROUP_COLORS.length], members: [""], order: draft.length }]);
+    setDraft([...draft, { id, name: `${id}組`, en: `Group ${id}`, dest: "", destEn: "", color: nthColor(draft.length, draft.map((g) => g.color)), members: [""], order: draft.length }]);
     setDirty(true);
   };
   const save = () => {
@@ -1896,11 +2373,7 @@ function GroupsEditor({ cfg, editing }) {
             ) : <b>{pick(lang, { name: g.name, en: { name: g.en } }, "name")}</b>}
             <span className="muted small nowrap">{t("sharesN", { n: g.members.filter((m) => m.trim()).length })}</span>
           </div>
-          {editing ? (
-            <div className="swatches" role="radiogroup" aria-label={t("color")}>
-              {GROUP_COLORS.map((c) => <button key={c} type="button" role="radio" aria-checked={g.color === c} className={"swatch" + (g.color === c ? " on" : "")} style={{ background: c }} onClick={() => upd(i, { color: c })} aria-label={c} />)}
-            </div>
-          ) : null}
+          {editing ? <ColorPick value={g.color} onChange={(c) => upd(i, { color: c })} /> : null}
           <div className="members">
             {g.members.map((m, j) => (
               editing ? (
@@ -2120,67 +2593,6 @@ function TripInfoEditor({ cfg, editing }) {
   );
 }
 
-const FLIGHT_FIELDS = [["no", "flNo"], ["date", "flDate"], ["from", "flFrom"], ["fromName", "flFromName"], ["dep", "flDep"], ["to", "flTo"], ["toName", "flToName"], ["arr", "flArr"], ["who", "flWho"], ["note", "note"]];
-function FlightSheet({ flight, onSave, onDelete, onClose }) {
-  const t = useT();
-  const [f, setF] = useState(() => ({ no: "", date: "", from: "", fromName: "", dep: "", to: "", toName: "", arr: "", who: "", note: "", color: GROUP_COLORS[0], ...flight }));
-  const save = (e) => {
-    e.preventDefault();
-    if (!f.no.trim()) return;
-    const out = { ...f, id: f.id || uid() };
-    if (flight && flight.en) {
-      const en = {};
-      Object.entries(flight.en).forEach(([k, v]) => { if (flight[k] === out[k]) en[k] = v; });
-      out.en = Object.keys(en).length ? en : null;
-    }
-    onSave(out);
-  };
-  return (
-    <Sheet title={flight ? t("editFlight") : t("addFlight")} onClose={onClose}>
-      <form className="form" onSubmit={save}>
-        <div className="fl-grid">
-          {FLIGHT_FIELDS.map(([k, label]) => (
-            <label key={k} className={"fld" + (["who", "note", "date"].includes(k) ? " wide" : "")}><span>{t(label)}</span>
-              <input className="input" value={f[k] || ""} onChange={(e) => setF({ ...f, [k]: e.target.value })} required={k === "no"} />
-            </label>
-          ))}
-        </div>
-        <div className="swatches">
-          {GROUP_COLORS.map((c) => <button key={c} type="button" className={"swatch" + (f.color === c ? " on" : "")} style={{ background: c }} onClick={() => setF({ ...f, color: c })} aria-label={c} />)}
-        </div>
-        <button className="btn full" type="submit">{t("save")}</button>
-        {flight ? <button type="button" className="btn full ghost danger-btn" onClick={() => { if (window.confirm(t("confirmDel", { x: flight.no }))) onDelete(); }}>{t("del")}</button> : null}
-      </form>
-    </Sheet>
-  );
-}
-function FlightsEditor({ editing }) {
-  const t = useT();
-  const lang = useLang();
-  const [ed, setEd] = useState(null); // {i} | {i:null}
-  const list = FLIGHTS.map((f, i) => ({ ...f, id: f.id || "f" + i }));
-  const write = (arr) => store.set("trip/config/flights", arr);
-  return (
-    <>
-      <ul className="fl-list">
-        {list.map((f, i) => (
-          <li key={f.id} className="fl-row" style={{ "--accent": f.color }}>
-            <b>{pick(lang, f, "no")}</b>
-            <span className="muted">{pick(lang, f, "date")}・{f.from} {fmtT(pick(lang, f, "dep"))} → {f.to} {fmtT(f.arr)}</span>
-            {editing ? <button className="edit-btn small" onClick={() => setEd({ i })}>{t("edit")}</button> : null}
-          </li>
-        ))}
-      </ul>
-      {editing ? <button className="btn ghost full" onClick={() => setEd({ i: null })}>{t("addFlightBtn")}</button> : null}
-      {ed ? (
-        <FlightSheet flight={ed.i == null ? null : list[ed.i]} onClose={() => setEd(null)}
-          onSave={(f) => { const arr = [...list]; if (ed.i == null) arr.push(f); else arr[ed.i] = f; write(arr); setEd(null); }}
-          onDelete={() => { write(list.filter((_, j) => j !== ed.i)); setEd(null); }} />
-      ) : null}
-    </>
-  );
-}
-
 function FeaturesEditor({ editing }) {
   const t = useT();
   const setF = (k, v) => store.set(`trip/config/features/${k}`, v);
@@ -2190,9 +2602,50 @@ function FeaturesEditor({ editing }) {
         <Seg full value={FEAT.kitty} onChange={(v) => editing && setF("kitty", v)} label={t("featKitty")} options={[["full", t("kFull")], ["log", t("kLog")], ["off", t("kOff")]]} />
       </div>
       <p className="hint">{t("featKittyHint")}</p>
-      <div className="set-row"><span>{t("stay")}</span><Seg value={FEAT.stays ? "on" : "off"} onChange={(v) => editing && setF("stays", v === "on")} label={t("stay")} options={[["on", t("on")], ["off", t("off")]]} /></div>
+      <div className="set-row"><span>{t("bookTitle")}</span><Seg value={FEAT.stays ? "on" : "off"} onChange={(v) => editing && setF("stays", v === "on")} label={t("bookTitle")} options={[["on", t("on")], ["off", t("off")]]} /></div>
       <div className="set-row"><span>{t("todo")}</span><Seg value={FEAT.todo ? "on" : "off"} onChange={(v) => editing && setF("todo", v === "on")} label={t("todo")} options={[["on", t("on")], ["off", t("off")]]} /></div>
     </>
+  );
+}
+
+function ScenePicker() {
+  const t = useT();
+  const cur = sceneNow();
+  const season = seasonOf(TRIP.startDate);
+  return (
+    <>
+      <div className="scene-grid">
+        {SCENES.map((sc) => (
+          <button key={sc} type="button" className={"scene-opt" + (cur === sc ? " on" : "")} aria-pressed={cur === sc} onClick={() => store.set("trip/config/scene", sc)}>
+            <HeroArt scene={sc} season={season} drive={DRIVE.on} cars={DRIVE.cars.slice(0, 3)} still />
+            <span>{t("sc_" + sc)}</span>
+          </button>
+        ))}
+      </div>
+      <p className="hint">{t("seasonAuto", { s: t("se_" + season) })}</p>
+    </>
+  );
+}
+function DriveEditor({ editing }) {
+  const t = useT();
+  return (
+    <>
+      <div className="set-row"><span>{t("selfDriveQ")}</span>
+        <Seg value={DRIVE.on ? "on" : "off"} onChange={(v) => store.set("trip/config/drive", driveOut(v === "on", DRIVE.cars))} label={t("selfDrive")} options={[["on", t("yes")], ["off", t("no")]]} />
+      </div>
+      {DRIVE.on ? <CarList editing={editing} /> : null}
+      <p className="hint">{DRIVE.on ? t("driveHint") : t("noDriveHint")}</p>
+    </>
+  );
+}
+function MePicker() {
+  const { me, setMe } = useMe();
+  return (
+    <div className="chips">
+      {GROUPS.flatMap((g) => g.members.map((p) => (
+        <button key={p} type="button" className={"chip small person-chip" + (me === p ? " on" : "")} style={{ "--accent": g.color }} aria-pressed={me === p} onClick={() => setMe(me === p ? "" : p)}>{p}</button>
+      )))}
+    </div>
   );
 }
 
@@ -2214,39 +2667,53 @@ function Settings({ editing, setEditing, askUnlock, lang, setLang, h12, setH12, 
       <SetCard title={t("display")}>
         <div className="set-row"><span>{t("language")}</span><Seg value={lang} onChange={setLang} label={t("language")} options={[["zh", "中文"], ["en", "English"]]} /></div>
         <div className="set-row"><span>{t("timeFmt")}</span><Seg value={h12 ? "12" : "24"} onChange={(v) => setH12(v === "12")} label={t("timeFmt")} options={[["24", "24h"], ["12", "12h"]]} /></div>
-        <p className="hint">{t("displayHint")}</p>
+        <div className="set-row col"><span>{t("meTitle")}</span><MePicker /></div>
+        <p className="hint">{t("meHint")}</p>
       </SetCard>
 
-      <SetCard title={t("tripInfo")}>
-        <TripInfoEditor cfg={cfg} editing={editing} />
-      </SetCard>
+      {editing ? (
+        <>
+          <SetCard title={t("tripInfo")}>
+            <TripInfoEditor cfg={cfg} editing={editing} />
+          </SetCard>
 
-      <SetCard title={t("tripDates")}>
-        <TripDates cfg={cfg} days={days} editing={editing} />
-      </SetCard>
+          <SetCard title={t("sceneTitle")}>
+            <ScenePicker />
+          </SetCard>
 
-      <SetCard title={t("flights")}>
-        <FlightsEditor editing={editing} />
-      </SetCard>
+          <SetCard title={t("tripDates")}>
+            <TripDates cfg={cfg} days={days} editing={editing} />
+          </SetCard>
 
-      <SetCard title={t("features")}>
-        <FeaturesEditor editing={editing} />
-      </SetCard>
+          <SetCard title={t("selfDrive")}>
+            <DriveEditor editing={editing} />
+          </SetCard>
 
-      <SetCard title={t("groupsPeople")}>
-        <GroupsEditor cfg={cfg} editing={editing} />
-      </SetCard>
+          <SetCard title={t("features")}>
+            <FeaturesEditor editing={editing} />
+          </SetCard>
 
-      <SetCard title={t("security")}>
-        {IS_VAULT ? <p className="hint">{t("vaultHint")}</p> : <PrivateLink editing={editing} />}
-        {IS_VAULT ? null : (
-          <>
-            <h3 className="set-sub">{t("pinTitle2")}</h3>
-            <PinEditor editing={editing} />
-            <button className="link-btn" onClick={forget}>{t("forgetPin")}</button>
-          </>
-        )}
-      </SetCard>
+          <SetCard title={t("groupsPeople")}>
+            <GroupsEditor cfg={cfg} editing={editing} />
+          </SetCard>
+
+          <SetCard title={t("security")}>
+            {IS_VAULT ? <p className="hint">{t("vaultHint")}</p> : <PrivateLink editing={editing} />}
+            {IS_VAULT ? null : (
+              <>
+                <h3 className="set-sub">{t("pinTitle2")}</h3>
+                <PinEditor editing={editing} />
+                <button className="link-btn" onClick={forget}>{t("forgetPin")}</button>
+              </>
+            )}
+          </SetCard>
+        </>
+      ) : (
+        <button type="button" className="card plain locked-card" onClick={askUnlock}>
+          <LockIcon open={false} />
+          <span>{t("lockedSettings")}</span>
+        </button>
+      )}
 
       <SetCard title={t("exportImport")}>
         <ExportBox editing={editing} />
@@ -2292,8 +2759,12 @@ function App() {
   const [h12, setH12] = usePersist("hok-h12", false);
   const [denied, setDenied] = useState(false);
   const cfg = useShared("trip/config");
+  const [me, setMe] = usePersist("hok-me", "");
   PREF.h12 = h12;
   applyConfig(cfg || defaultConfig());
+  if (IS_VAULT && !(cfg && cfg.drive)) { DRIVE.on = false; DRIVE.cars = []; }
+  const myG = groupOfPerson(me);
+  const meVal = useMemo(() => ({ me: myG ? me : "", setMe, myG }), [me, myG && myG.id, myG && myG.color, myG && myG.members.join()]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => store.onDenied(() => setDenied(true)), []);
   const remoteDays = useShared("trip/days");
   const days = asArray(remoteDays).length ? asArray(remoteDays) : withEn(DAYS);
@@ -2315,6 +2786,7 @@ function App() {
 
   return (
     <LangCtx.Provider value={lang}>
+      <MeCtx.Provider value={meVal}>
       <div className={"app" + (lang === "en" ? " en" : "")}>
         <TopNav tab={tab} setTab={setTab} status={status} />
         {IS_VAULT ? <button className="vault-banner" onClick={lockTokyo}><TowerIcon size={19} ink="#FFFCF6" /> {tr(lang, "vaultOn")}・<u>{tr(lang, "vaultLock")}</u></button> : null}
@@ -2330,6 +2802,7 @@ function App() {
 
         {pinOpen ? <PinSheet pin={pin} onOk={pinOk} onClose={() => setPinOpen(false)} /> : null}
       </div>
+      </MeCtx.Provider>
     </LangCtx.Provider>
   );
 }

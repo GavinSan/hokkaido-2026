@@ -6,7 +6,7 @@ export const useLang = () => useContext(LangCtx);
 
 const S = {
   // nav
-  home: ["首頁", "Home"], plan: ["行程", "Plan"], todo: ["清單", "To-do"], stay: ["住宿", "Stay"], money: ["夾錢", "Kitty"],
+  home: ["首頁", "Home"], plan: ["行程", "Plan"], todo: ["清單", "To-do"], stay: ["預訂", "Travel"], money: ["夾錢", "Kitty"],
   unlock: ["解鎖編輯模式", "Unlock edit mode"], lockIt: ["鎖返編輯模式", "Lock edit mode"],
   lockConfirm: ["鎖返編輯模式？", "Lock edit mode?"],
   editBanner: ["編輯模式中・改嘅嘢全部人即時見到", "Edit mode · changes are live for everyone"],
@@ -18,8 +18,8 @@ const S = {
   departLine: ["10/10（六）08:30 HX690 香港出發", "Sat 10/10 08:30 · HX690 from Hong Kong"],
   onTrip: ["旅程進行中", "On the trip"], dayN: ["第 {n} 日", "Day {n}"], seeToday: ["撳入去睇今日行程 →", "Tap for today's plan →"],
   tripDone: ["旅程完滿結束 🍁", "Trip complete 🍁"], tripDoneSub: ["下次再嚟北海道！", "See you again, Hokkaido!"],
-  flights: ["航班", "Flights"], overview: ["七日一覽", "7 days at a glance"], stayInfo: ["住宿資料", "Where we stay"], kitty: ["公數袋", "Kitty"],
-  subtitle: ["2026・10/10 – 10/16・楓葉・海鮮・溫泉・7人2架車", "2026 · Oct 10–16 · Autumn leaves, seafood, onsen · 7 people, 2 cars"],
+  flights: ["航班", "Flights"], overview: ["七日一覽", "7 days at a glance"], stayInfo: ["航班・住宿", "Flights & stays"], kitty: ["公數袋", "Kitty"],
+  subtitle: ["2026・10/10 – 10/16・楓葉・海鮮・溫泉", "2026 · Oct 10–16 · Autumn leaves, seafood, onsen"], nPeopleCars: ["{p}人{c}架車", "{p} people, {c} cars"], nPeople: ["{p}人", "{p} people"],
   // plan
   pickDate: ["揀日期", "Pick a day"], today: ["今日", "Today"], must: ["★ 必去", "★ Must-go"], needBook: ["要訂位", "Book ahead"], booked: ["已訂位 ✓", "Booked ✓"],
   mustEat: ["必食：", "Must-eat: "], map: ["地圖", "Map"], nav: ["導航", "Navigate"], edit: ["改", "Edit"], addStop: ["＋ 加行程", "＋ Add stop"],
@@ -40,7 +40,7 @@ const S = {
   pinTitle: ["輸入 PIN 解鎖", "Enter PIN to unlock"], pinWrong: ["PIN 唔啱", "Wrong PIN"], clear: ["清除", "Clear"],
   // todo
   todoTitle: ["待辦清單", "To-do list"], doneOf: ["完成 {a} / {b}", "{a} of {b} done"], addItem: ["加一項…", "Add an item…"], add: ["加", "Add"],
-  loading: ["載入中…", "Loading…"], todoHint: ["清單全部人共用，邊個剔咗大家都見到。", "Shared list — everyone sees what's ticked."], other: ["其他", "Other"],
+  loading: ["載入中…", "Loading…"], todoHint: ["清單全部人共用，邊個剔咗大家都見到。撳鉛筆可以改內容同揀俾邊組。", "Shared list — everyone sees what's ticked. Tap the pencil to edit or assign it to a group."], other: ["其他", "Other"],
   // stay
   stayTitle: ["住宿", "Stay"], copyAddr: ["複製地址", "Copy address"], copied: ["已複製 ✓", "Copied ✓"], navBack: ["導航去", "Navigate"],
   nearby: ["附近", "Nearby"], addStay: ["＋ 加住宿", "＋ Add stay"], editStay: ["改住宿", "Edit stay"], newStay: ["加住宿", "Add stay"],
@@ -103,7 +103,7 @@ const S = {
   sortBy: ["排序", "Sort"], s_new: ["最新", "Newest"], s_old: ["最舊", "Oldest"], s_high: ["$ 高", "$ High"], s_low: ["$ 低", "$ Low"],
   collapseAll: ["全部收埋", "Collapse all"], expandAll: ["全部打開", "Expand all"], allExp: ["全部支出", "All payments"],
   done: ["完成", "Done"], editOn: ["編輯中", "Editing"], editOff: ["睇緊（唔會改到嘢）", "View only"],
-  editOnHint: ["改完撳「完成」。", "Tap “Done” when finished."], editOffHint: ["撳「編輯」先改得行程、住宿、夾錢同設定。", "Tap “Edit” to change the plan, stays, kitty and settings."],
+  editOnHint: ["改完撳「完成」。", "Tap “Done” when finished."], editOffHint: ["撳「編輯」入 PIN，先改得行程、預訂、夾錢，同埋睇到其他設定。", "Tap “Edit” and enter the PIN to change the plan, bookings and kitty, and to see the other settings."],
   forgetPin: ["喺呢部手機忘記 PIN", "Forget PIN on this phone"],
   vaultLock: ["鎖上", "Lock"], tokyoLockTitle: ["私人行程", "Private plan"], tokyoLockSub: ["輸入密碼開啟", "Enter the code to open"], toHokkaido: ["← 返北海道行程", "← Back to the Hokkaido plan"],
   tripInfo: ["旅程資料", "Trip details"], tripTitle: ["標題", "Title"], tripTitleEn: ["英文標題", "English title"], tripSub: ["副標題", "Subtitle"], tripSubEn: ["英文副標題", "English subtitle"],
@@ -115,6 +115,23 @@ const S = {
   featKittyHint: ["兩三個人去或者唔使夾錢，可以揀「只記支出」或者「唔使」。", "For small trips choose “Log only” or turn it off."],
   on: ["開", "On"], off: ["關", "Off"], moneyLog: ["支出", "Spending"], moneyLogNav: ["支出", "Spend"], logSub: ["記低每筆支出，睇用咗幾多", "Log each payment and see the total"], nPayments: ["{n} 筆", "{n} payments"],
   editBtn: ["編輯", "Edit"],
+  bookTitle: ["預訂", "Bookings"], bookSub: ["航班・租車・住宿", "Flights · cars · stays"], cars: ["租車", "Cars"], carN: ["{n}號車", "Car {n}"],
+  carName: ["車名（例：Toyota）", "Name (e.g. Toyota)"], whoInCar: ["坐呢架車嘅人", "Who's in this car"], addCar: ["＋ 加一架車", "＋ Add car"],
+  editCar: ["改車", "Edit car"], newCar: ["加車", "Add car"], noOne: ["未分配", "Not assigned"], unassigned: ["未有車坐：{x}", "No car yet: {x}"],
+  selfDrive: ["自駕", "Driving"], selfDriveQ: ["呢個旅程有冇自己揸車？", "Are you driving on this trip?"], yes: ["有", "Yes"], no: ["冇", "No"],
+  driveHint: ["首頁會畫返幾多架車；多過三架就會變成車隊駛過。", "The home picture draws each car — more than three become a convoy driving past."],
+  noDriveHint: ["唔揸車：首頁會畫火車。", "Not driving: the home picture shows a train."],
+  everyone: ["全部人", "Everyone"], pickWho: ["撳組名＝成組；撳名＝個別揀", "Tap a group for all of it, or pick people"],
+  meTitle: ["我係", "I am"], meQ: ["你係邊個？", "Who are you?"], meHint: ["揀咗之後，清單、航班、車同行程會標出你組嘅嘢（只係呢部手機）。", "Your group's to-dos, flights, car and stops get highlighted (this phone only)."],
+  you: ["你", "You"], mine: ["我組", "Mine"], later: ["遲啲先", "Later"],
+  lockedSettings: ["旅程資料、首頁插圖、自駕、功能、分組同私隱設定，要撳「編輯」入 PIN 先睇到。", "Trip details, home picture, driving, features, groups and privacy appear after you tap “Edit” and enter the PIN."],
+  sceneTitle: ["首頁插圖", "Home picture"], sc_hokkaido: ["北海道", "Hokkaido"], sc_tokyo: ["城市", "City"], sc_kyoto: ["古都", "Old town"], sc_beach: ["海邊", "Beach"], sc_camp: ["山野", "Mountains"],
+  seasonAuto: ["季節跟出發月份自動轉：而家係{s}。", "The season follows the start month: {s}."], se_spring: ["春天", "spring"], se_summer: ["夏天", "summer"], se_autumn: ["秋天", "autumn"], se_winter: ["冬天", "winter"],
+  sortDate: ["按日期排", "Sort by date"], sortAmt: ["按金額排", "Sort by amount"], tip_new: ["最新先", "Newest first"], tip_old: ["最舊先", "Oldest first"], tip_high: ["金額大至細", "Largest first"], tip_low: ["金額細至大", "Smallest first"],
+  editTodo: ["改項目", "Edit item"], todoText: ["內容", "Item"], forWho: ["俾邊個", "For"],
+  addNear: ["＋ 加附近地方", "＋ Add nearby place"], nearName: ["地方", "Place"], nearNote: ["備註", "Note"],
+  swipeHint: ["左右掃都可以轉日子", "Swipe left or right to change day"], customColor: ["自訂顏色", "Custom colour"],
+  yourFlight: ["你嘅航班", "Your flight"], yourCar: ["你架車", "Your car"], editFlights: ["改航班", "Edit flights"],
   c_food: ["食", "Food"], c_car: ["油／泊車", "Fuel/Parking"], c_ticket: ["門票", "Tickets"], c_transport: ["交通", "Transport"], c_super: ["超市", "Groceries"], c_other: ["其他", "Other"],
 };
 
