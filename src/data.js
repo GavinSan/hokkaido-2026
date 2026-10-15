@@ -152,6 +152,8 @@ export const TODO_SEED = [
 /* ===== 設定（會由 Firebase trip/config 覆蓋） ===== */
 TRIP.nDays = 7;
 export const PREF = { h12: false }; // 每部手機自己嘅顯示設定
+// 功能開關（可以喺設定改）：kitty = full（公數袋）／log（只記支出）／off
+export const FEAT = { kitty: "full", todo: true, stays: true };
 export const GROUP_COLORS = ["#F2A497", "#A8D3E6", "#B9DAA5", "#F6D27A", "#D8C8EA", "#F7C9D6"];
 const DEFAULT_GROUPS = GROUPS.map((g) => ({ ...g, members: [...g.members] }));
 export const defaultConfig = () => ({
@@ -170,6 +172,18 @@ export function applyConfig(cfg) {
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
   if (groups.length) GROUPS.splice(0, GROUPS.length, ...groups);
   PEOPLE.splice(0, PEOPLE.length, ...GROUPS.flatMap((g) => g.members));
+  // 旅程資料
+  if (c.title) TRIP.title = c.title;
+  if (c.titleEn) TRIP.titleEn = c.titleEn;
+  TRIP.subtitle = c.subtitle || "";
+  TRIP.subtitleEn = c.subtitleEn || "";
+  if (c.depart) TRIP.departISO = c.depart;
+  const fl = Array.isArray(c.flights) ? c.flights : c.flights && typeof c.flights === "object" ? Object.values(c.flights) : null;
+  if (fl) FLIGHTS.splice(0, FLIGHTS.length, ...fl.filter(Boolean));
+  const f = c.features || {};
+  FEAT.kitty = ["full", "log", "off"].includes(f.kitty) ? f.kitty : "full";
+  FEAT.todo = f.todo !== false;
+  FEAT.stays = f.stays !== false;
 }
 // 由開始日期計返每日嘅 MM/DD 同星期
 export function dayList() {
@@ -192,7 +206,7 @@ export function fmtT(t) {
 export const VAULT_TRIP = { title: "東京三日兩夜", titleEn: "Tokyo 3D2N", departISO: "2026-10-16T07:30:00+09:00" };
 export const VAULT_FLIGHTS = [
   { id: "v1", no: "NH50", date: "10/16（五）", from: "CTS", fromName: "新千歲", dep: "07:30", to: "HND", toName: "羽田", arr: "09:05", who: "Gavin、Athena", color: "#F2A497", en: { date: "Fri 10/16", fromName: "New Chitose", toName: "Haneda", who: "Gavin, Athena" } },
-  { id: "v2", no: "待填", date: "10/18（日）", from: "TYO", fromName: "東京", dep: "—", to: "YYZ", toName: "多倫多", arr: "—", who: "Gavin、Athena", color: "#A8D3E6", en: { no: "TBC", date: "Sun 10/18", fromName: "Tokyo", toName: "Toronto", who: "Gavin, Athena" } },
+  { id: "v2", no: "AC2", date: "10/18（日）", from: "HND", fromName: "羽田 T3", dep: "18:05", to: "YYZ", toName: "多倫多 T1", arr: "17:00", who: "Gavin、Athena", color: "#A8D3E6", note: "同日到達", en: { date: "Sun 10/18", fromName: "Haneda T3", toName: "Toronto T1", who: "Gavin, Athena", note: "Arrives same day" } },
 ];
 export function vaultSeed(now) {
   return {

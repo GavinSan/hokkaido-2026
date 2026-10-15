@@ -156,14 +156,35 @@ export async function vaultPath(code) {
     return await sha256(VAULT_SALT + "path:" + code);
   } catch (e) { return null; }
 }
-export function currentVault() {
-  try { return sessionStorage.getItem(VAULT_STORE) || ""; } catch (e) { return ""; }
+// 東京私人行程用獨立網址 …/tokyo/，解鎖後喺呢部手機記住
+export const MODE = typeof window !== "undefined" && window.HOK_MODE === "tokyo" ? "tokyo" : "main";
+export const TOKYO_KEY = "hok-tokyo-key";
+export function appRoot() {
+  if (typeof window === "undefined") return "/";
+  const dir = window.location.pathname.replace(/[^/]*$/, "");
+  return MODE === "tokyo" ? dir.replace(/tokyo\/$/, "") : dir;
 }
-export const IS_VAULT = typeof window !== "undefined" && !!currentVault();
+export const tokyoHref = () => appRoot() + "tokyo/";
+export const mainHref = () => appRoot();
+export function currentVault() {
+  try { return MODE === "tokyo" ? localStorage.getItem(TOKYO_KEY) || "" : ""; } catch (e) { return ""; }
+}
+export function lockTokyo() { try { localStorage.removeItem(TOKYO_KEY); } catch (e) { /* ignore */ } window.location.reload(); }
+export function openTokyo(vp) { try { localStorage.setItem(TOKYO_KEY, vp); } catch (e) { /* ignore */ } window.location.href = tokyoHref(); }
+export const IS_VAULT = MODE === "tokyo" && !!currentVault();
+export const TOKYO_LOCKED = MODE === "tokyo" && !currentVault();
+// 舊版喺主頁用 sessionStorage 入東京：搬去新網址
+if (typeof window !== "undefined" && MODE === "main") {
+  try {
+    const old = sessionStorage.getItem(VAULT_STORE);
+    if (old) { sessionStorage.removeItem(VAULT_STORE); openTokyo(old); }
+  } catch (e) { /* ignore */ }
+}
 
 export function createStore() {
   const cfg = typeof window !== "undefined" ? window.FIREBASE_CONFIG : null;
   const vault = typeof window !== "undefined" ? currentVault() : "";
+  if (TOKYO_LOCKED) return createLocal();
   if (vault && cfg && cfg.apiKey) return createFirebase(cfg, `trips/${vault}`);
   const key = typeof window !== "undefined" ? currentKey() : "";
   if (cfg && cfg.apiKey && cfg.databaseURL && !String(cfg.apiKey).startsWith("PASTE")) return createFirebase(cfg, key ? `trips/${key}` : "trip");

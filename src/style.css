@@ -598,6 +598,43 @@ button.exp-ghead { width: 100%; border: 2px solid var(--ink); border-radius: 14p
 .fold-chev.open { transform: rotate(90deg); }
 .fold-in { animation: drop-down .3s ease both; }
 
+/* ---------- v6：編輯掣、下一站、航班動畫、東京 ---------- */
+.edit-fab { position: fixed; right: max(16px, calc(50vw - 264px)); bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 60;
+  border: var(--line); border-radius: 999px; background: var(--paper); padding: 7px 14px; font-weight: 700; font-size: 15px; box-shadow: 2px 2px 0 var(--ink); opacity: .95; }
+.edit-fab.on { background: var(--yellow); }
+.edit-fab:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+main { padding-bottom: 90px; }
+.tl-item.is-next .tl-card { border-style: solid; background: #EAF4F8; }
+.edit-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.edit-row .hint { margin: 2px 0 0; }
+.edit-row.on { background: #FFF6DE; }
+.set-row.col { flex-direction: column; align-items: stretch; gap: 6px; }
+.fl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.fl-row { display: flex; align-items: center; gap: 8px; border: 2px solid var(--ink); border-left: 8px solid var(--accent); border-radius: 12px; padding: 6px 10px; font-size: 14px; }
+.fl-row .muted { flex: 1; min-width: 0; font-size: 12.5px; }
+.fl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fl-grid .fld.wide { grid-column: 1 / -1; }
+.lock-btn.gear { width: 40px; height: 40px; position: relative; }
+/* 航班：飛機橫越成條路 */
+.flight-route { grid-template-columns: auto 1fr auto; gap: 10px; }
+.fly-path { width: auto; min-width: 90px; height: 24px; overflow: hidden; }
+.fly-plane { left: 0; width: 100%; animation: fly-across 6.5s ease-in-out infinite; }
+.fly-plane svg { display: block; }
+@keyframes fly-across {
+  0% { transform: translate(-30px, 3px) rotate(-8deg); opacity: 0; }
+  8% { opacity: 1; }
+  50% { transform: translate(calc(50% - 20px), -4px) rotate(0deg); }
+  92% { opacity: 1; }
+  100% { transform: translate(calc(100% - 10px), 3px) rotate(8deg); opacity: 0; }
+}
+.fb-sky { width: 110px; }
+.fb-plane { left: 0; width: 100%; top: 11px; animation: fly-across 6.5s ease-in-out infinite; }
+/* 東京鎖畫面 */
+.tokyo-lock main { padding-top: 40px; }
+.lock-hero { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 22px; background: #FBE7E2; font-size: 42px; }
+.lock-hero svg { width: 80px; height: 40px; }
+.center-link { display: block; text-align: center; margin: 6px auto 0; }
+
 /* 「減少動態效果」：全部停晒 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

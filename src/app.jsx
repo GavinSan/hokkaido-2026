@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { TRIP, PEOPLE, GROUPS, FLIGHTS, STAY_NEAR, STAYS_SEED, DAYS, BACKUP, TODO_SEED, EDIT_PIN, PREF, GROUP_COLORS, defaultConfig, applyConfig, dayList, fmtT, VAULT_TRIP, VAULT_FLIGHTS, vaultSeed } from "./data.js";
+import { TRIP, PEOPLE, GROUPS, FLIGHTS, STAY_NEAR, STAYS_SEED, DAYS, BACKUP, TODO_SEED, EDIT_PIN, PREF, FEAT, GROUP_COLORS, defaultConfig, applyConfig, dayList, fmtT, VAULT_TRIP, VAULT_FLIGHTS, vaultSeed } from "./data.js";
 import { HeroArt, DayArt, HouseArt, PurseArt, BagArt, PlaneMini } from "./art.jsx";
-import { createStore, newKey, KEY_STORE, IS_VAULT, vaultPath, VAULT_STORE } from "./store.js";
+import { createStore, newKey, KEY_STORE, IS_VAULT, TOKYO_LOCKED, vaultPath, lockTokyo, openTokyo, mainHref, tokyoHref } from "./store.js";
 import { LangCtx, useLang, useT, tr, pick, WEEK_EN, EN_DAYS, EN_STOPS, EN_TODO, EN_CAT, withEn } from "./i18n.js";
 
 const store = createStore();
@@ -10,7 +10,7 @@ if (IS_VAULT) {
   Object.assign(TRIP, VAULT_TRIP);
   FLIGHTS.splice(0, FLIGHTS.length, ...VAULT_FLIGHTS);
 }
-const exitVault = () => { try { sessionStorage.removeItem(VAULT_STORE); } catch (e) { /* ignore */ } window.location.reload(); };
+const PIN_OK = "hok-pin-ok";
 const SCHEMA_V = 12;
 
 // v7：登別併入 10/14 大圈；10/15 改做札幌 chill day
@@ -153,43 +153,51 @@ function dayText(lang, day, idx) {
 }
 const weekday = (lang, w) => (lang === "en" ? WEEK_EN[w] || w : w);
 
-/* ---------------- 東京私人行程：加入建議（只會做一次） ---------------- */
+/* ---------------- 東京私人行程：建議行程（v101） ---------------- */
 const HOTEL_Q = "東京都墨田区太平4-13-4";
 function tokyoPlan(days, stays) {
-  const map = { "trip/meta/v": 100 };
+  const map = { "trip/meta/v": 101, "trip/config/features": { kitty: "off", todo: true, stays: true } };
   const s1 = stays && stays.s1;
   if (s1 && !s1.addr) map["trip/stays/s1/addr"] = "〒130-0012 東京都墨田区太平4丁目13-4";
   const W = (t, name, q, move, extra = {}) => ({ t, name, q, ...(move ? { move } : {}), ...extra });
   const d0 = days.findIndex((d) => d.d === "10/16");
   const d1 = days.findIndex((d) => d.d === "10/17");
   const d2 = days.findIndex((d) => d.d === "10/18");
-  if (d0 >= 0 && asArray(days[d0].stops).length <= 3) {
-    map[`trip/days/${d0}/stops`] = sortStops([...asArray(days[d0].stops),
-      W("10:30", "酒店放行李（錦糸町）", HOTEL_Q, { t: "train", min: 60 }, { note: "京急直通都營淺草線去押上／本所吾妻橋，或者搭的士；最近錦糸町站", en: { name: "Drop bags at hotel (Kinshicho)", note: "Keikyu through-train on the Toei Asakusa Line to Oshiage, or taxi; nearest is Kinshicho Stn" } }),
-      W("11:30", "根室花丸 KITTE丸の内（攞飛）", "根室花まる KITTE丸の内店", { t: "train", min: 15 }, { must: true, note: "錦糸町搭 JR 總武快速 8 分鐘到東京站；KITTE 5F 機攞飛，掃 QR 用 LINE 等通知", en: { name: "Nemuro Hanamaru, KITTE Marunouchi (get a ticket)", note: "JR Sobu Rapid Kinshicho → Tokyo 8 min; ticket machine on KITTE 5F, LINE alerts via QR" } }),
-      W("12:00", "等位：KITTE 天台花園／丸之內散步", "KITTE ガーデン", { t: "walk", min: 2 }, { en: { name: "While waiting: KITTE rooftop garden / Marunouchi stroll" } }),
-      W("13:30", "根室花丸 食壽司", "根室花まる KITTE丸の内店", { t: "walk", min: 2 }, { dish: "壽司", en: { name: "Sushi at Nemuro Hanamaru", dish: "Sushi" } }),
-      W("15:00", "銀座行街（Uniqlo／GU 旗艦、Dover Street Market）", "ユニクロ 銀座店", { t: "walk", min: 15 }, { en: { name: "Ginza shopping (Uniqlo / GU flagships, Dover Street Market)" } }),
-      W("18:30", "返錦糸町 晚飯／休息", HOTEL_Q, { t: "train", min: 20 }, { note: "晴空塔就喺附近，想睇夜景可以行過去", en: { name: "Back to Kinshicho for dinner / rest", note: "Tokyo Skytree is nearby for a night view" } }),
+  if (d0 >= 0) {
+    const keep = asArray(days[d0].stops).filter((x) => /的士|NH50|抵達羽田/.test(x.name || ""));
+    map[`trip/days/${d0}/stops`] = sortStops([...keep,
+      W("10:30", "酒店放行李（錦糸町）", HOTEL_Q, { t: "train", min: 60 }, { note: "京急→都營淺草線（部分班次直通）去押上／本所吾妻橋，或者搭的士；最近錦糸町站", en: { name: "Drop bags at hotel (Kinshicho)", note: "Keikyu → Toei Asakusa Line (some trains run through) to Oshiage, or taxi; nearest is Kinshicho Stn" } }),
+      W("11:30", "午餐（錦糸町 PARCO／Termina）", "錦糸町パルコ", { t: "walk", min: 10 }, { en: { name: "Lunch (Kinshicho PARCO / Termina)" } }),
+      W("13:00", "銀座行街：Uniqlo／GU 旗艦、Dover Street Market、3COINS+plus 西銀座", "ユニクロ 銀座店", { t: "train", min: 20 }, { must: true, note: "3COINS+plus 喺西銀座デパート 2F，11:00–20:00", en: { name: "Ginza: Uniqlo / GU flagships, Dover Street Market, 3COINS+plus Nishi-Ginza", note: "3COINS+plus at Nishi-Ginza Dept. 2F, 11:00–20:00" } }),
+      W("18:00", "3COINS+plus アルカキット錦糸町", "アルカキット錦糸町", { t: "train", min: 20 }, { note: "酒店附近，返去順路行（營業時間到時睇）", en: { name: "3COINS+plus Arcakit Kinshicho", note: "Near the hotel — check closing time" } }),
+      W("19:00", "晚飯（錦糸町）", HOTEL_Q, { t: "walk", min: 5 }, { en: { name: "Dinner (Kinshicho)" } }),
     ]);
   }
-  if (d1 >= 0 && asArray(days[d1].stops).length === 0) {
-    map[`trip/days/${d1}/title`] = "Cafe＋買波鞋買衫";
-    map[`trip/days/${d1}/en`] = { title: "Cafés + sneakers & clothes", intro: "The Hanzomon Line runs direct from Kinshicho to Kiyosumi-Shirakawa and Omotesando." };
+  if (d1 >= 0) {
+    map[`trip/days/${d1}/title`] = "Cafe＋3COINS＋波鞋買衫";
+    map[`trip/days/${d1}/en`] = { title: "Café + 3COINS + sneakers & clothes", intro: "The Hanzomon Line runs direct from Kinshicho to Kiyosumi-Shirakawa and Omotesando." };
     map[`trip/days/${d1}/intro`] = "半藏門線由錦糸町直通清澄白河同表參道，唔使轉車。";
     map[`trip/days/${d1}/stops`] = [
       W("09:30", "清澄白河 coffee（Blue Bottle 清澄白河旗艦店）", "ブルーボトルコーヒー 清澄白河フラッグシップカフェ", { t: "train", min: 10 }, { note: "半藏門線兩個站；附近仲有好多 roaster", en: { name: "Kiyosumi-Shirakawa coffee (Blue Bottle flagship)", note: "Two stops on the Hanzomon Line; lots of roasters nearby" } }),
-      W("11:30", "原宿 Cat Street 波鞋（atmos、Nike 原宿、Onitsuka Tiger）", "キャットストリート 原宿", { t: "train", min: 30 }, { must: true, note: "半藏門線直達表參道；週六下晝好多人，早啲去", en: { name: "Harajuku Cat Street sneakers (atmos, Nike Harajuku, Onitsuka Tiger)", note: "Hanzomon Line direct to Omotesando; go early before Saturday crowds" } }),
+      W("11:00", "3COINS 原宿本店", "3COINS 原宿本店", { t: "train", min: 30 }, { must: true, note: "旗艦店，11:00–20:00；有原宿店限定貨；神宮前6-12-22", en: { name: "3COINS Harajuku flagship", note: "Flagship, 11:00–20:00; Harajuku-only items; Jingumae 6-12-22" } }),
+      W("11:45", "原宿 Cat Street 波鞋（atmos、Nike 原宿、Onitsuka Tiger）", "キャットストリート 原宿", { t: "walk", min: 5 }, { must: true, note: "週六下晝好多人，早啲行", en: { name: "Harajuku Cat Street sneakers (atmos, Nike Harajuku, Onitsuka Tiger)", note: "Busy on Saturday afternoons — go early" } }),
       W("13:30", "午餐（表參道／原宿）", "表参道", { t: "walk", min: 5 }, { en: { name: "Lunch (Omotesando / Harajuku)" } }),
       W("15:00", "澀谷買衫（PARCO、MIYASHITA PARK）", "渋谷PARCO", { t: "walk", min: 15 }, { en: { name: "Shibuya clothes (PARCO, MIYASHITA PARK)" } }),
       W("18:30", "返錦糸町", HOTEL_Q, { t: "train", min: 30 }, { note: "澀谷搭半藏門線直達", en: { name: "Back to Kinshicho", note: "Hanzomon Line direct from Shibuya" } }),
     ];
   }
-  if (d2 >= 0 && asArray(days[d2].stops).length <= 1) {
-    map[`trip/days/${d2}/stops`] = sortStops([...asArray(days[d2].stops),
-      W("09:00", "慢慢食早餐／執行李", HOTEL_Q, null, { note: "睇航班時間，最遲起飛前3小時到機場", en: { name: "Slow breakfast / pack", note: "Be at the airport 3h before departure" } }),
+  if (d2 >= 0) {
+    map[`trip/days/${d2}/title`] = "東京 → 多倫多（AC2）";
+    map[`trip/days/${d2}/en`] = { title: "Tokyo → Toronto (AC2)" };
+    map[`trip/days/${d2}/intro`] = "AC2 羽田 T3 18:05 → 多倫多 T1 17:00（同日）。15:00 前到機場。";
+    map[`trip/days/${d2}/stops`] = [
+      W("09:00", "慢慢食早餐／執行李", HOTEL_Q, null, { en: { name: "Slow breakfast / pack" } }),
       W("10:00", "晴空塔 Solamachi 最後買嘢", "東京ソラマチ", { t: "walk", min: 15 }, { en: { name: "Last shopping at Tokyo Skytree Solamachi" } }),
-    ]);
+      W("12:30", "午餐（Solamachi）", "東京ソラマチ", { t: "walk", min: 2 }, { en: { name: "Lunch (Solamachi)" } }),
+      W("13:45", "酒店攞行李 → 羽田", "羽田空港 第3ターミナル", { t: "train", min: 60 }, { note: "押上／本所吾妻橋搭京急直通，或者的士", en: { name: "Collect bags → Haneda", note: "Keikyu through-train from Oshiage, or taxi" } }),
+      W("15:00", "羽田 T3 Check-in（Air Canada）", "羽田空港 第3ターミナル", { t: "walk", min: 5 }, { note: "國際線起飛前3小時到", en: { name: "Haneda T3 check-in (Air Canada)", note: "Arrive 3h before an international flight" } }),
+      W("18:05", "AC2 羽田 → 多倫多", "羽田空港 第3ターミナル", { t: "plane", txt: "AC2" }, { must: true, note: "抵達多倫多 T1 當地時間 17:00；最近成日 delay，出發前睇航班狀態", en: { name: "AC2 Haneda → Toronto", note: "Arrives Toronto T1 17:00 local; often delayed lately — check status" } }),
+    ];
   }
   return map;
 }
@@ -214,7 +222,7 @@ function useSeedAndMigrate() {
       return;
     }
     if (IS_VAULT) {
-      if (meta && (meta.v || 0) < 100) {
+      if (meta && (meta.v || 0) < 101) {
         if (days === undefined || stays === undefined) return;
         done.current = true;
         store.update(tokyoPlan(asArray(days), stays));
@@ -315,25 +323,25 @@ const TABS = ["home", "plan", "stay", "money", "todo"];
 const GearIcon = () => (<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="3.4" fill="#F6D27A" stroke="#3E3A39" strokeWidth="2.4" /><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M5.5 18.5l2.1-2.1M16.4 7.6l2.1-2.1" stroke="#3E3A39" strokeWidth="2.4" strokeLinecap="round" /></svg>);
 const STATUS_C = { online: "#6DB35A", connecting: "#F6D27A", offline: "#F2A497", error: "#C4584A", local: "#BDB6B2" };
 
-function TopNav({ tab, setTab, editing, toggleEdit, status }) {
+function TopNav({ tab, setTab, status }) {
   const t = useT();
   return (
     <header className="topnav">
-      <nav className="topnav-inner" aria-label="menu">
-        {TABS.map((id) => (
+      <nav className="topnav-inner" aria-label="menu" style={{ gridTemplateColumns: `repeat(${visibleTabs().length}, 1fr) 40px` }}>
+        {visibleTabs().map((id) => (
           <button key={id} className={"nav-btn" + (tab === id ? " on" : "")} aria-current={tab === id ? "page" : undefined} onClick={() => setTab(id)}>
-            {t(id)}
+            {id === "money" && FEAT.kitty === "log" ? t("moneyLogNav") : t(id)}
           </button>
         ))}
-        <button className={"lock-btn gear" + (tab === "settings" ? " on" : "")} onClick={() => setTab("settings")} aria-label={t("settings")}><GearIcon /></button>
-        <button className={"lock-btn" + (editing ? " on" : "")} onClick={toggleEdit} aria-label={editing ? t("lockIt") : t("unlock")} title={t("st_" + status)}>
-          <LockIcon open={editing} />
+        <button className={"lock-btn gear" + (tab === "settings" ? " on" : "")} onClick={() => setTab("settings")} aria-label={t("settings")} title={t("st_" + status)}>
+          <GearIcon />
           <span className="sync-dot" style={{ background: STATUS_C[status] }} />
         </button>
       </nav>
     </header>
   );
 }
+const visibleTabs = () => TABS.filter((id) => (id === "money" ? FEAT.kitty !== "off" : id === "todo" ? FEAT.todo : id === "stay" ? FEAT.stays : true));
 function LockIcon({ open }) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -363,27 +371,26 @@ function Sheet({ title, onClose, children }) {
 }
 
 /* ---------------- PIN 數字鍵盤 ---------------- */
-function PinSheet({ onOk, onClose, pin: PIN = EDIT_PIN }) {
+const DelIcon = () => (
+  <svg viewBox="0 0 34 24" width="38" height="27" aria-hidden="true"><path d="M11 2 H31 Q33 2 33 4 V20 Q33 22 31 22 H11 L2 12 Z" fill="#FFFCF6" stroke="#3E3A39" strokeWidth="2.6" strokeLinejoin="round" /><path d="M16 8 L24 16 M24 8 L16 16" stroke="#3E3A39" strokeWidth="2.8" strokeLinecap="round" /></svg>
+);
+// check(code) → "ok" | "bad" | "more"（可以係 Promise）
+function PinPad({ maxLen, check }) {
   const t = useT();
   const [pin, setPin] = useState("");
   const [bad, setBad] = useState(false);
-  const press = (k) => {
+  const busy = useRef(false);
+  const press = async (k) => {
+    if (busy.current) return;
     if (k === "del") { setPin((p) => p.slice(0, -1)); return; }
     if (k === "clr") { setPin(""); return; }
-    const next = (pin + k).slice(0, PIN.length);
+    const next = (pin + k).slice(0, maxLen);
     setPin(next);
     setBad(false);
-    if (next.length === 4 && !IS_VAULT) {
-      vaultPath(next).then((vp) => {
-        if (vp) { try { sessionStorage.setItem(VAULT_STORE, vp); } catch (e) { /* ignore */ } window.location.reload(); }
-        else if (PIN.length === 4) { if (next === PIN) onOk(); else { setBad(true); setPin(""); } }
-      });
-      if (PIN.length === 4) return;
-    }
-    if (next.length === PIN.length) {
-      if (next === PIN) setTimeout(onOk, 120);
-      else setTimeout(() => { setBad(true); setPin(""); }, 150);
-    }
+    busy.current = true;
+    const r = await check(next);
+    busy.current = false;
+    if (r === "bad" || (r === "more" && next.length >= maxLen)) setTimeout(() => { setBad(true); setPin(""); }, 120);
   };
   useEffect(() => {
     const onKey = (e) => { if (/^\d$/.test(e.key)) press(e.key); else if (e.key === "Backspace") press("del"); };
@@ -391,19 +398,61 @@ function PinSheet({ onOk, onClose, pin: PIN = EDIT_PIN }) {
     return () => window.removeEventListener("keydown", onKey);
   });
   return (
-    <Sheet title={t("pinTitle")} onClose={onClose}>
+    <>
       <div className={"pin-dots" + (bad ? " shake" : "")} aria-live="polite">
-        {Array.from({ length: PIN.length }).map((_, i) => <span key={i} className={"pin-dot" + (i < pin.length ? " on" : "")} />)}
+        {Array.from({ length: maxLen }).map((_, i) => <span key={i} className={"pin-dot" + (i < pin.length ? " on" : "")} />)}
       </div>
       <div className="pin-msg">{bad ? t("pinWrong") : " "}</div>
       <div className="keypad">
         {["1", "2", "3", "4", "5", "6", "7", "8", "9", "clr", "0", "del"].map((k) => (
-          <button key={k} className={"key" + (k.length > 1 ? " fn" : "")} onClick={() => press(k)} aria-label={k === "del" ? <svg viewBox="0 0 34 24" width="38" height="27" aria-hidden="true"><path d="M11 2 H31 Q33 2 33 4 V20 Q33 22 31 22 H11 L2 12 Z" fill="#FFFCF6" stroke="#3E3A39" strokeWidth="2.6" strokeLinejoin="round" /><path d="M16 8 L24 16 M24 8 L16 16" stroke="#3E3A39" strokeWidth="2.8" strokeLinecap="round" /></svg> : k === "clr" ? t("clear") : k}>
-            {k === "del" ? <svg viewBox="0 0 34 24" width="38" height="27" aria-hidden="true"><path d="M11 2 H31 Q33 2 33 4 V20 Q33 22 31 22 H11 L2 12 Z" fill="#FFFCF6" stroke="#3E3A39" strokeWidth="2.6" strokeLinejoin="round" /><path d="M16 8 L24 16 M24 8 L16 16" stroke="#3E3A39" strokeWidth="2.8" strokeLinecap="round" /></svg> : k === "clr" ? t("clear") : k}
+          <button key={k} className={"key" + (k.length > 1 ? " fn" : "")} onClick={() => press(k)} aria-label={k === "del" ? "Delete" : k === "clr" ? t("clear") : k}>
+            {k === "del" ? <DelIcon /> : k === "clr" ? t("clear") : k}
           </button>
         ))}
       </div>
+    </>
+  );
+}
+
+function PinSheet({ onOk, onClose, pin: PIN = EDIT_PIN }) {
+  const t = useT();
+  const check = async (code) => {
+    if (code.length === 4 && !IS_VAULT) {
+      const vp = await vaultPath(code);
+      if (vp) { openTokyo(vp); return "ok"; }
+    }
+    if (code === PIN) { setTimeout(onOk, 120); return "ok"; }
+    return code.length < PIN.length ? "more" : "bad";
+  };
+  return (
+    <Sheet title={t("pinTitle")} onClose={onClose}>
+      <PinPad maxLen={Math.max(4, PIN.length)} check={check} />
     </Sheet>
+  );
+}
+
+// 東京網址未解鎖時嘅畫面
+export function TokyoLock() {
+  const [lang] = usePersist("hok-lang", "zh");
+  const check = async (code) => {
+    const vp = await vaultPath(code);
+    if (vp) { openTokyo(vp); return "ok"; }
+    return code.length < 4 ? "more" : "bad";
+  };
+  return (
+    <LangCtx.Provider value={lang}>
+      <div className="app tokyo-lock">
+        <main>
+          <div className="page">
+            <div className="lock-hero card"><PlaneMini color="#F2A497" /><span>🗼</span></div>
+            <h1 className="title">{tr(lang, "tokyoLockTitle")}</h1>
+            <p className="subtitle">{tr(lang, "tokyoLockSub")}</p>
+            <div className="card plain"><PinPad maxLen={4} check={check} /></div>
+            <a className="link-btn center-link" href={mainHref()}>{tr(lang, "toHokkaido")}</a>
+          </div>
+        </main>
+      </div>
+    </LangCtx.Provider>
   );
 }
 
@@ -439,6 +488,13 @@ function NowNext({ nn, days, onOpen }) {
   );
 }
 
+function departLine(lang) {
+  const f = FLIGHTS[0];
+  if (!f) return "";
+  const p = (k) => pick(lang, f, k);
+  return `${p("date")} ${fmtT(p("dep"))} ${p("no")} ${p("fromName")} → ${p("toName")}`;
+}
+
 function Countdown({ goPlan, days }) {
   const t = useT();
   const lang = useLang();
@@ -455,7 +511,7 @@ function Countdown({ goPlan, days }) {
             <div key={u} className="cd-cell"><div className="cd-num">{String(v).padStart(2, "0")}</div><div className="cd-unit">{t(u)}</div></div>
           ))}
         </div>
-        <div className="cd-foot">{IS_VAULT ? t("vaultDepart") : t("departLine")}</div>
+        <div className="cd-foot">{departLine(lang)}</div>
       </div>
     );
   }
@@ -512,7 +568,7 @@ function Home({ goPlan, setTab, days, status }) {
     <div className="page">
       <div className="hero card"><HeroArt /></div>
       <h1 className="title">{lang === "en" ? TRIP.titleEn : TRIP.title}</h1>
-      <p className="subtitle">{IS_VAULT ? t("vaultSub") : t("subtitle")}</p>
+      <p className="subtitle">{(lang === "en" ? TRIP.subtitleEn : TRIP.subtitle) || (IS_VAULT ? t("vaultSub") : t("subtitle"))}</p>
       {di < 0 ? <Countdown goPlan={goPlan} days={days} /> : null}
 
       {today ? (
@@ -921,7 +977,6 @@ function Plan({ days, day, setDay, editing }) {
           </div>
         </div>
         {isToday ? <NowNext nn={nn} days={days} /> : null}
-        {editing ? <p className="hint center">{t("dragHint")}</p> : null}
 
         {sections.map((sec) => (
           <div key={sec.key} className="tl-section">
@@ -1281,7 +1336,7 @@ function CatPicker({ value, onChange, cats, canAdd }) {
 }
 
 // 支出欄位（新增同修改共用）
-function ExpenseFields({ v, set, cats }) {
+function ExpenseFields({ v, set, cats, simple }) {
   const t = useT();
   return (
     <>
@@ -1289,8 +1344,8 @@ function ExpenseFields({ v, set, cats }) {
         <YenInput value={v.amt} onChange={(x) => set("amt", x)} label={t("amount")} big />
         <input className="input" placeholder={t("item")} value={v.what} onChange={(e) => set("what", e.target.value)} aria-label={t("item")} />
       </div>
-      <div className="fld"><span>{t("whoPaid")}</span><PayerPicker value={v.payer} onChange={(x) => set("payer", x)} /></div>
-      <div className="fld"><span>{t("splitAmong")}</span><SplitPicker value={v.split} onChange={(x) => set("split", x)} /></div>
+      {simple ? null : <div className="fld"><span>{t("whoPaid")}</span><PayerPicker value={v.payer} onChange={(x) => set("payer", x)} /></div>}
+      {simple ? null : <div className="fld"><span>{t("splitAmong")}</span><SplitPicker value={v.split} onChange={(x) => set("split", x)} /></div>}
       <div className="fld"><span>{t("category")}</span><CatPicker value={v.cat} onChange={(x) => set("cat", x)} cats={cats} canAdd /></div>
       <div className="fld"><span>{t("whichDay")}</span>
         <div className="chips">{dayList().map((d, i) => <button type="button" key={d.d} className={"chip small" + (v.day === i ? " on" : "")} onClick={() => set("day", i)}>D{i + 1}</button>)}</div>
@@ -1305,14 +1360,14 @@ function expenseOut(v) {
   return { amt: n, what: (v.what || "").trim() || v.cat, cat: v.cat, day: v.day, payer: v.payer, split: v.split };
 }
 
-function ExpenseSheet({ exp, cats, onClose }) {
+function ExpenseSheet({ exp, cats, simple, onClose }) {
   const t = useT();
   const [v, setV] = useState(() => ({ ...blankExpense(), ...exp, amt: String(exp.amt || ""), what: exp.what === exp.cat ? "" : exp.what || "", payer: exp.payer || "kitty", split: exp.split || allSplit(), day: Number(exp.day) || 0 }));
   const set = (k, x) => setV((o) => ({ ...o, [k]: x }));
   return (
     <Sheet title={t("editExp")} onClose={onClose}>
       <form className="form" onSubmit={(e) => { e.preventDefault(); const out = expenseOut(v); if (!out) return; store.set(`trip/kitty/expenses/${exp.id}`, { ...out, ts: exp.ts || Date.now() }); onClose(); }}>
-        <ExpenseFields v={v} set={set} cats={cats} />
+        <ExpenseFields v={v} set={set} cats={cats} simple={simple} />
         <button className="btn full" type="submit">{t("save")}</button>
         <button type="button" className="btn full ghost danger-btn" onClick={() => { if (window.confirm(t("delExp", { x: `${exp.what} ${yen(exp.amt)}` }))) { store.remove(`trip/kitty/expenses/${exp.id}`); onClose(); } }}>{t("del")}</button>
       </form>
@@ -1425,7 +1480,7 @@ function SettleCards({ R, rate }) {
 }
 
 // 支出紀錄：按日／按分類／全部，最新喺最頂
-function ExpenseList({ expenses, editing, cats, rate, onEdit }) {
+function ExpenseList({ expenses, editing, cats, rate, onEdit, simple }) {
   const t = useT();
   const lang = useLang();
   const [gb, setGb] = usePersist("hok-exp-group", "day");
@@ -1445,7 +1500,7 @@ function ExpenseList({ expenses, editing, cats, rate, onEdit }) {
   else if (gb === "day") {
     groups = dayList().map((d, i) => ({ key: i, order: i, title: `Day ${i + 1}・${d.d}（${weekday(lang, d.w)}）`, items: expenses.filter((e) => (Number(e.day) || 0) === i) }))
       .filter((g) => g.items.length);
-  } else if (gb === "payer") {
+  } else if (gb === "payer" && !simple) {
     groups = [{ id: "kitty", color: "#F6D27A" }, ...GROUPS.map((g) => ({ id: g.id, color: g.color }))]
       .map((o) => ({ key: o.id, title: o.id === "kitty" ? t("kittyCash") : t("cardOf", { g: pick(lang, groupOf(o.id), "name") }), color: o.color, items: expenses.filter((e) => (e.payer || "kitty") === o.id) }))
       .filter((g) => g.items.length);
@@ -1470,7 +1525,7 @@ function ExpenseList({ expenses, editing, cats, rate, onEdit }) {
 
   return (
     <div className="exp-wrap">
-      <Seg full label={t("groupBy")} value={gb} onChange={setGb} options={[["day", t("byDay")], ["cat", t("byCat")], ["payer", t("byPayer")], ["all", t("all")]]} />
+      <Seg full label={t("groupBy")} value={gb} onChange={setGb} options={simple ? [["day", t("byDay")], ["cat", t("byCat")], ["all", t("all")]] : [["day", t("byDay")], ["cat", t("byCat")], ["payer", t("byPayer")], ["all", t("all")]]} />
       <div className="exp-tools">
         <span className="tools-label">{t("sortBy")}</span>
         <Seg label={t("sortBy")} value={sortBy} onChange={setSortBy} options={[["new", t("s_new")], ["old", t("s_old")], ["high", t("s_high")], ["low", t("s_low")]]} />
@@ -1504,8 +1559,8 @@ function ExpenseList({ expenses, editing, cats, rate, onEdit }) {
                           <span className="exp-meta">
                             {gb !== "day" ? <span className="tag tiny" style={{ background: "#F4EFE8" }}>D{(Number(e.day) || 0) + 1}</span> : null}
                             {gb !== "cat" ? <span className="tag tiny" style={{ background: "#F4EFE8" }}>{catName(lang, cats, e.cat)}</span> : null}
-                            {gb === "payer" ? null : <span className="tag tiny" style={{ background: g ? g.color : "#F6D27A" }}>{p === "kitty" ? t("kittyCash") : t("cardOf", { g: pick(lang, g, "name") })}</span>}
-                            {sp !== allSplit() ? <span className="tag tiny ghost-tag">{t("onlyFor", { g: sp.split("").join("+") })}</span> : null}
+                            {gb === "payer" || simple ? null : <span className="tag tiny" style={{ background: g ? g.color : "#F6D27A" }}>{p === "kitty" ? t("kittyCash") : t("cardOf", { g: pick(lang, g, "name") })}</span>}
+                            {sp !== allSplit() && !simple ? <span className="tag tiny ghost-tag">{t("onlyFor", { g: sp.split("").join("+") })}</span> : null}
                           </span>
                         </span>
                         <Yen v={e.amt} rate={rate} cls="exp-amt right" />
@@ -1554,9 +1609,16 @@ function Money({ editing, askUnlock, goSettings }) {
     flash(t("logged", { x: yen(out.amt) }));
   };
 
+  const simple = FEAT.kitty === "log";
   const summary = () => {
     const nm = (id) => whoName(lang, id);
     const L = lang === "en";
+    if (simple) {
+      const byCat = {};
+      expenses.forEach((e) => { const c = catName(lang, cats, e.cat); byCat[c] = (byCat[c] || 0) + (Number(e.amt) || 0); });
+      return [L ? "💴 *Spending*" : "💴 *支出*", `${t("spentAll")}：${yen(R.spent)}（≈ ${hkd(R.spent, rate)}）`, "",
+        ...Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => `${c}：${yen(v)}`)].join("\n");
+    }
     return [
       L ? "💰 *Hokkaido Kitty*" : "💰 *北海道公數袋*",
       `${t("cashLeft")}：${yen(R.left)}（≈ ${hkd(R.left, rate)}）`,
@@ -1598,9 +1660,18 @@ function Money({ editing, askUnlock, goSettings }) {
     <div className="page">
       <div className="page-head">
         <PurseArt />
-        <div><h1 className="title left">{t("kitty")}</h1><p className="subtitle left">{t("kittySub")}</p></div>
+        <div><h1 className="title left">{simple ? t("moneyLog") : t("kitty")}</h1><p className="subtitle left">{simple ? t("logSub") : t("kittySub")}</p></div>
       </div>
 
+      {simple ? (
+        <div className="card kitty-sum">
+          <div className="ks-big">
+            <div className="ks-l">{t("spentAll")}</div>
+            <Yen v={R.spent} rate={rate} cls="big" />
+            <div className="ks-l">{t("nPayments", { n: expenses.length })}</div>
+          </div>
+        </div>
+      ) : (
       <div className="card kitty-sum">
         <div className="ks-big">
           <div className="ks-l">{t("cashLeft")}</div>
@@ -1614,25 +1685,25 @@ function Money({ editing, askUnlock, goSettings }) {
         <div className="bar" aria-label={`${Math.round(usedPct)}%`}><div className="bar-fill coral" style={{ width: usedPct + "%" }} /></div>
         {R.left < 0 ? <div className="ks-foot warn">{t("short")}</div> : null}
       </div>
+      )}
 
       <SpendChart expenses={expenses} cats={cats} rate={rate} />
 
       {editing ? (
         <form className="card plain exp-form" onSubmit={addExpense}>
           <h2 className="form-title">{t("addExp")}</h2>
-          <ExpenseFields v={nv} set={setN} cats={cats} />
+          <ExpenseFields v={nv} set={setN} cats={cats} simple={simple} />
           <button className="btn full" type="submit">{t("logIt")}</button>
           {msg ? <div className="toast" role="status">{msg}</div> : null}
         </form>
-      ) : (
-        <button className="card plain lock-note" onClick={askUnlock}><LockIcon open={false} /> {t("unlockToLog")}</button>
-      )}
+      ) : null}
 
       <h2 className="sec">{t("expenses", { n: expenses.length })}</h2>
       {kitty === undefined ? <div className="card plain empty">{t("loading")}</div> : (
-        <ExpenseList expenses={expenses} editing={editing} cats={cats} rate={rate} onEdit={setEditExp} />
+        <ExpenseList expenses={expenses} editing={editing} cats={cats} rate={rate} onEdit={setEditExp} simple={simple} />
       )}
 
+      {simple ? null : (<>
       <h2 className="sec">{t("cashInTitle")}</h2>
       <div className="cash-grid">
         {GROUPS.map((g) => {
@@ -1684,6 +1755,7 @@ function Money({ editing, askUnlock, goSettings }) {
         )}
         <div className="hint">{t("settleNow")}</div>
       </div>
+      </>)}
 
       <h2 className="sec">{t("shareBackup")}</h2>
       <div className="card plain">
@@ -1700,7 +1772,7 @@ function Money({ editing, askUnlock, goSettings }) {
         </label>
       </div>
 
-      {editExp ? <ExpenseSheet exp={editExp} cats={cats} onClose={() => setEditExp(null)} /> : null}
+      {editExp ? <ExpenseSheet exp={editExp} cats={cats} simple={simple} onClose={() => setEditExp(null)} /> : null}
       {cashSheet ? <CashSheet g={cashSheet.g} entry={cashSheet.entry} onClose={() => setCashSheet(null)} /> : null}
     </div>
   );
@@ -1973,11 +2045,123 @@ function ExportBox({ editing }) {
   );
 }
 
-function Settings({ editing, askUnlock, lang, setLang, h12, setH12, cfg, days }) {
+/* ---------- 設定：旅程資料／航班／功能 ---------- */
+function TripInfoEditor({ cfg, editing }) {
   const t = useT();
+  const init = () => ({ title: TRIP.title || "", titleEn: TRIP.titleEn || "", subtitle: TRIP.subtitle || "", subtitleEn: TRIP.subtitleEn || "",
+    depart: (() => { try { const d = new Date(TRIP.departISO); const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return z.toISOString().slice(0, 16); } catch (e) { return ""; } })() });
+  const [f, setF] = useState(init);
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => { if (!dirty) setF(init()); }, [cfg]); // eslint-disable-line react-hooks/exhaustive-deps
+  const set = (k) => (e) => { setF({ ...f, [k]: e.target.value }); setDirty(true); };
+  const save = () => {
+    const map = { "trip/config/title": f.title.trim() || null, "trip/config/titleEn": f.titleEn.trim() || null, "trip/config/subtitle": f.subtitle.trim() || null, "trip/config/subtitleEn": f.subtitleEn.trim() || null };
+    if (f.depart) { const d = new Date(f.depart); if (!isNaN(d)) map["trip/config/depart"] = d.toISOString(); }
+    store.update(map);
+    setDirty(false);
+  };
+  return (
+    <div className="form">
+      <label className="fld"><span>{t("tripTitle")}</span><input className="input" value={f.title} onChange={set("title")} disabled={!editing} /></label>
+      <label className="fld"><span>{t("tripTitleEn")}</span><input className="input" value={f.titleEn} onChange={set("titleEn")} disabled={!editing} /></label>
+      <label className="fld"><span>{t("tripSub")}</span><input className="input" value={f.subtitle} onChange={set("subtitle")} disabled={!editing} placeholder={t("subtitle")} /></label>
+      <label className="fld"><span>{t("tripSubEn")}</span><input className="input" value={f.subtitleEn} onChange={set("subtitleEn")} disabled={!editing} /></label>
+      <label className="fld"><span>{t("departAt")}</span><input className="input date" type="datetime-local" value={f.depart} onChange={set("depart")} disabled={!editing} /></label>
+      {editing ? <button className="btn full" disabled={!dirty} onClick={save}>{dirty ? t("save") : t("saved")}</button> : null}
+    </div>
+  );
+}
+
+const FLIGHT_FIELDS = [["no", "flNo"], ["date", "flDate"], ["from", "flFrom"], ["fromName", "flFromName"], ["dep", "flDep"], ["to", "flTo"], ["toName", "flToName"], ["arr", "flArr"], ["who", "flWho"], ["note", "note"]];
+function FlightSheet({ flight, onSave, onDelete, onClose }) {
+  const t = useT();
+  const [f, setF] = useState(() => ({ no: "", date: "", from: "", fromName: "", dep: "", to: "", toName: "", arr: "", who: "", note: "", color: GROUP_COLORS[0], ...flight }));
+  const save = (e) => {
+    e.preventDefault();
+    if (!f.no.trim()) return;
+    const out = { ...f, id: f.id || uid() };
+    if (flight && flight.en) {
+      const en = {};
+      Object.entries(flight.en).forEach(([k, v]) => { if (flight[k] === out[k]) en[k] = v; });
+      out.en = Object.keys(en).length ? en : null;
+    }
+    onSave(out);
+  };
+  return (
+    <Sheet title={flight ? t("editFlight") : t("addFlight")} onClose={onClose}>
+      <form className="form" onSubmit={save}>
+        <div className="fl-grid">
+          {FLIGHT_FIELDS.map(([k, label]) => (
+            <label key={k} className={"fld" + (["who", "note", "date"].includes(k) ? " wide" : "")}><span>{t(label)}</span>
+              <input className="input" value={f[k] || ""} onChange={(e) => setF({ ...f, [k]: e.target.value })} required={k === "no"} />
+            </label>
+          ))}
+        </div>
+        <div className="swatches">
+          {GROUP_COLORS.map((c) => <button key={c} type="button" className={"swatch" + (f.color === c ? " on" : "")} style={{ background: c }} onClick={() => setF({ ...f, color: c })} aria-label={c} />)}
+        </div>
+        <button className="btn full" type="submit">{t("save")}</button>
+        {flight ? <button type="button" className="btn full ghost danger-btn" onClick={() => { if (window.confirm(t("confirmDel", { x: flight.no }))) onDelete(); }}>{t("del")}</button> : null}
+      </form>
+    </Sheet>
+  );
+}
+function FlightsEditor({ editing }) {
+  const t = useT();
+  const lang = useLang();
+  const [ed, setEd] = useState(null); // {i} | {i:null}
+  const list = FLIGHTS.map((f, i) => ({ ...f, id: f.id || "f" + i }));
+  const write = (arr) => store.set("trip/config/flights", arr);
+  return (
+    <>
+      <ul className="fl-list">
+        {list.map((f, i) => (
+          <li key={f.id} className="fl-row" style={{ "--accent": f.color }}>
+            <b>{pick(lang, f, "no")}</b>
+            <span className="muted">{pick(lang, f, "date")}・{f.from} {fmtT(pick(lang, f, "dep"))} → {f.to} {fmtT(f.arr)}</span>
+            {editing ? <button className="edit-btn small" onClick={() => setEd({ i })}>{t("edit")}</button> : null}
+          </li>
+        ))}
+      </ul>
+      {editing ? <button className="btn ghost full" onClick={() => setEd({ i: null })}>{t("addFlightBtn")}</button> : null}
+      {ed ? (
+        <FlightSheet flight={ed.i == null ? null : list[ed.i]} onClose={() => setEd(null)}
+          onSave={(f) => { const arr = [...list]; if (ed.i == null) arr.push(f); else arr[ed.i] = f; write(arr); setEd(null); }}
+          onDelete={() => { write(list.filter((_, j) => j !== ed.i)); setEd(null); }} />
+      ) : null}
+    </>
+  );
+}
+
+function FeaturesEditor({ editing }) {
+  const t = useT();
+  const setF = (k, v) => store.set(`trip/config/features/${k}`, v);
+  return (
+    <>
+      <div className="set-row col"><span>{t("featKitty")}</span>
+        <Seg full value={FEAT.kitty} onChange={(v) => editing && setF("kitty", v)} label={t("featKitty")} options={[["full", t("kFull")], ["log", t("kLog")], ["off", t("kOff")]]} />
+      </div>
+      <p className="hint">{t("featKittyHint")}</p>
+      <div className="set-row"><span>{t("stay")}</span><Seg value={FEAT.stays ? "on" : "off"} onChange={(v) => editing && setF("stays", v === "on")} label={t("stay")} options={[["on", t("on")], ["off", t("off")]]} /></div>
+      <div className="set-row"><span>{t("todo")}</span><Seg value={FEAT.todo ? "on" : "off"} onChange={(v) => editing && setF("todo", v === "on")} label={t("todo")} options={[["on", t("on")], ["off", t("off")]]} /></div>
+    </>
+  );
+}
+
+function Settings({ editing, setEditing, askUnlock, lang, setLang, h12, setH12, cfg, days, pin }) {
+  const t = useT();
+  const forget = () => { try { localStorage.removeItem(PIN_OK); } catch (e) { /* ignore */ } setEditing(false); };
   return (
     <div className="page">
       <h1 className="title left">{t("settings")}</h1>
+
+      <section className={"card plain edit-row" + (editing ? " on" : "")}>
+        <div>
+          <b>{editing ? t("editOn") : t("editOff")}</b>
+          <p className="hint">{editing ? t("editOnHint") : t("editOffHint")}</p>
+        </div>
+        <button className={"btn" + (editing ? " yellow" : "")} onClick={() => (editing ? setEditing(false) : askUnlock())}>{editing ? `✓ ${t("done")}` : `✏️ ${t("editBtn")}`}</button>
+      </section>
 
       <SetCard title={t("display")}>
         <div className="set-row"><span>{t("language")}</span><Seg value={lang} onChange={setLang} label={t("language")} options={[["zh", "中文"], ["en", "English"]]} /></div>
@@ -1985,18 +2169,35 @@ function Settings({ editing, askUnlock, lang, setLang, h12, setH12, cfg, days })
         <p className="hint">{t("displayHint")}</p>
       </SetCard>
 
-      <SetCard title={t("tripDates")} locked={!editing} askUnlock={askUnlock}>
+      <SetCard title={t("tripInfo")}>
+        <TripInfoEditor cfg={cfg} editing={editing} />
+      </SetCard>
+
+      <SetCard title={t("tripDates")}>
         <TripDates cfg={cfg} days={days} editing={editing} />
       </SetCard>
 
-      <SetCard title={t("groupsPeople")} locked={!editing} askUnlock={askUnlock}>
+      <SetCard title={t("flights")}>
+        <FlightsEditor editing={editing} />
+      </SetCard>
+
+      <SetCard title={t("features")}>
+        <FeaturesEditor editing={editing} />
+      </SetCard>
+
+      <SetCard title={t("groupsPeople")}>
         <GroupsEditor cfg={cfg} editing={editing} />
       </SetCard>
 
-      <SetCard title={t("security")} locked={!editing} askUnlock={askUnlock}>
+      <SetCard title={t("security")}>
         {IS_VAULT ? <p className="hint">{t("vaultHint")}</p> : <PrivateLink editing={editing} />}
-        <h3 className="set-sub">{t("pinTitle2")}</h3>
-        <PinEditor editing={editing} />
+        {IS_VAULT ? null : (
+          <>
+            <h3 className="set-sub">{t("pinTitle2")}</h3>
+            <PinEditor editing={editing} />
+            <button className="link-btn" onClick={forget}>{t("forgetPin")}</button>
+          </>
+        )}
       </SetCard>
 
       <SetCard title={t("exportImport")}>
@@ -2029,11 +2230,15 @@ function DeniedScreen() {
 }
 
 /* ---------------- App ---------------- */
-export default function App() {
+export default function Root() {
+  return TOKYO_LOCKED ? <TokyoLock /> : <App />;
+}
+
+function App() {
   const [lang, setLang] = usePersist("hok-lang", "zh");
-  const [tab, setTab] = usePersist("hok-tab", "home");
+  const [tab, setTab] = usePersist(IS_VAULT ? "hok-tab-tokyo" : "hok-tab", "home");
   const [day, setDay] = useState(() => Math.max(0, tripDayIndex()));
-  const [editing, setEditing] = usePersist(IS_VAULT ? "hok-edit-vault" : "hok-edit2", IS_VAULT);
+  const [editing, setEditing] = usePersist(IS_VAULT ? "hok-edit-vault" : "hok-edit2", false);
   const [pinOpen, setPinOpen] = useState(false);
   const [status, setStatus] = useState(store.mode === "local" ? "local" : "connecting");
   const [h12, setH12] = usePersist("hok-h12", false);
@@ -2044,35 +2249,42 @@ export default function App() {
   useEffect(() => store.onDenied(() => setDenied(true)), []);
   const remoteDays = useShared("trip/days");
   const days = asArray(remoteDays).length ? asArray(remoteDays) : withEn(DAYS);
+  const pin = (cfg && cfg.pin) || EDIT_PIN;
 
   useSeedAndMigrate();
   useEffect(() => store.onStatus(setStatus), []);
   useEffect(() => { window.scrollTo(0, 0); }, [tab]);
-  useEffect(() => { document.documentElement.lang = lang === "en" ? "en" : "zh-Hant"; document.title = lang === "en" ? TRIP.titleEn : TRIP.title; }, [lang]);
+  useEffect(() => { if (tab !== "settings" && !visibleTabs().includes(tab)) setTab("home"); });
+  useEffect(() => { document.documentElement.lang = lang === "en" ? "en" : "zh-Hant"; document.title = lang === "en" ? TRIP.titleEn : TRIP.title; }, [lang, cfg]);
 
-  const askUnlock = () => setPinOpen(true);
-  const toggleEdit = () => {
-    if (editing) { if (window.confirm(tr(lang, "lockConfirm"))) setEditing(false); }
-    else askUnlock();
-  };
+  // 編輯：呢部手機入過一次 PIN 就記住，之後撳「編輯／完成」切換
+  const remembered = () => { try { return localStorage.getItem(PIN_OK) === pin; } catch (e) { return false; } };
+  const startEdit = () => { if (IS_VAULT || remembered()) setEditing(true); else setPinOpen(true); };
+  const askUnlock = startEdit;
+  const pinOk = () => { try { localStorage.setItem(PIN_OK, pin); } catch (e) { /* ignore */ } setEditing(true); setPinOpen(false); };
   const goPlan = (i) => { setDay(i); setTab("plan"); };
+  const showFab = !denied && ["plan", "stay", "money"].includes(tab);
 
   return (
     <LangCtx.Provider value={lang}>
       <div className={"app" + (lang === "en" ? " en" : "")}>
-        <TopNav tab={tab} setTab={setTab} editing={editing} toggleEdit={toggleEdit} status={status} />
-        {editing && !IS_VAULT ? <div className="edit-banner">{tr(lang, "editBanner")}</div> : null}
-        {IS_VAULT ? <button className="vault-banner" onClick={exitVault}>🔒 {tr(lang, "vaultOn")}・<u>{tr(lang, "vaultExit")}</u></button> : null}
-        <main className={IS_VAULT ? "with-vault" : editing ? "with-banner" : ""}>
+        <TopNav tab={tab} setTab={setTab} status={status} />
+        {IS_VAULT ? <button className="vault-banner" onClick={lockTokyo}>🗼 {tr(lang, "vaultOn")}・<u>{tr(lang, "vaultLock")}</u></button> : null}
+        <main className={IS_VAULT ? "with-vault" : ""}>
           {denied ? <DeniedScreen /> : null}
           {!denied && tab === "home" && <Home goPlan={goPlan} setTab={setTab} days={days} status={status} />}
           {!denied && tab === "plan" && <Plan days={days} day={day < days.length ? day : 0} setDay={setDay} editing={editing} />}
           {!denied && tab === "todo" && <Todo />}
           {!denied && tab === "stay" && <Stay editing={editing} />}
           {!denied && tab === "money" && <Money editing={editing} askUnlock={askUnlock} goSettings={() => setTab("settings")} />}
-          {!denied && tab === "settings" && <Settings editing={editing} askUnlock={askUnlock} lang={lang} setLang={setLang} h12={h12} setH12={setH12} cfg={cfg} days={days} />}
+          {!denied && tab === "settings" && <Settings editing={editing} setEditing={setEditing} askUnlock={askUnlock} lang={lang} setLang={setLang} h12={h12} setH12={setH12} cfg={cfg} days={days} pin={pin} />}
         </main>
-        {pinOpen ? <PinSheet pin={(cfg && cfg.pin) || EDIT_PIN} onOk={() => { setEditing(true); setPinOpen(false); }} onClose={() => setPinOpen(false)} /> : null}
+        {showFab ? (
+          <button className={"edit-fab" + (editing ? " on" : "")} onClick={() => (editing ? setEditing(false) : startEdit())} aria-pressed={editing}>
+            {editing ? <>✓ {tr(lang, "done")}</> : <>✏️ {tr(lang, "editBtn")}</>}
+          </button>
+        ) : null}
+        {pinOpen ? <PinSheet pin={pin} onOk={pinOk} onClose={() => setPinOpen(false)} /> : null}
       </div>
     </LangCtx.Provider>
   );
