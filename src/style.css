@@ -635,6 +635,19 @@ main { padding-bottom: 90px; }
 .lock-hero svg { width: 80px; height: 40px; }
 .center-link { display: block; text-align: center; margin: 6px auto 0; }
 
+/* ---------- 編輯掣（v7） ---------- */
+.edit-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: var(--line); border-radius: 999px; background: var(--paper); font-weight: 700; box-shadow: 2px 2px 0 var(--ink); color: var(--ink); }
+.edit-toggle:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--ink); }
+.edit-toggle.on { background: var(--yellow); }
+.edit-toggle.et-wide { width: 100%; padding: 12px 0; font-size: 16.5px; margin-top: 22px; }
+.edit-toggle.et-pill { padding: 6px 14px 6px 11px; font-size: 15px; flex: 0 0 auto; }
+.nowrap { white-space: nowrap; }
+.page-head .ph-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.page-head .ph-body { flex: 1; min-width: 0; }
+.payer-icon svg { display: block; }
+.vault-banner svg { vertical-align: -3px; margin-right: 2px; }
+main { padding-bottom: 48px; }
+
 /* 「減少動態效果」：全部停晒 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

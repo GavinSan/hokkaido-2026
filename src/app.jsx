@@ -351,6 +351,45 @@ function LockIcon({ open }) {
   );
 }
 
+/* ---------------- 編輯掣（自畫 SVG） ---------------- */
+const PencilIcon = () => (
+  <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true">
+    <path d="M4 20 L5 15.5 L15.5 5 Q17 3.5 18.5 5 L19 5.5 Q20.5 7 19 8.5 L8.5 19 Z" fill="#F6D27A" stroke="#3E3A39" strokeWidth="2.2" strokeLinejoin="round" />
+    <path d="M13.5 7 L17 10.5" stroke="#3E3A39" strokeWidth="2.2" strokeLinecap="round" />
+    <path d="M4 20 L8.5 19 L5 15.5 Z" fill="#F2A497" stroke="#3E3A39" strokeWidth="2" strokeLinejoin="round" />
+  </svg>
+);
+const CheckIcon = () => (
+  <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true">
+    <circle cx="12" cy="12" r="9.5" fill="#B9DAA5" stroke="#3E3A39" strokeWidth="2.2" />
+    <path d="M7.5 12.5 L10.8 15.6 L16.5 9" fill="none" stroke="#3E3A39" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const CardIcon = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+    <rect x="3" y="6" width="18" height="12.5" rx="2.5" fill="#FFFCF6" stroke="#3E3A39" strokeWidth="2" />
+    <path d="M3 10 H21" stroke="#3E3A39" strokeWidth="2.6" />
+    <path d="M6 15 H10" stroke="#3E3A39" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+const TowerIcon = ({ size = 18, ink = "#3E3A39" }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+    <path d="M12 2 V5 M12 5 L16.5 21 H7.5 Z" fill="#F2A497" stroke={ink} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+    <path d="M9.6 13 H14.4 M10.6 9 H13.4" stroke={ink} strokeWidth="1.6" strokeLinecap="round" />
+    <rect x="9" y="15.5" width="6" height="2" fill="#FFFCF6" stroke={ink} strokeWidth="1.4" />
+  </svg>
+);
+// variant: "bar"（頁底成條）／"pill"（標題隔離細掣）
+function EditToggle({ editing, onToggle, variant = "wide" }) {
+  const t = useT();
+  return (
+    <button type="button" className={"edit-toggle et-" + variant + (editing ? " on" : "")} onClick={onToggle} aria-pressed={editing}>
+      {editing ? <CheckIcon /> : <PencilIcon />}
+      <span>{editing ? t("done") : t("editBtn")}</span>
+    </button>
+  );
+}
+
 /* ---------------- 底部彈出框 ---------------- */
 function Sheet({ title, onClose, children }) {
   const t = useT();
@@ -444,7 +483,7 @@ export function TokyoLock() {
       <div className="app tokyo-lock">
         <main>
           <div className="page">
-            <div className="lock-hero card"><PlaneMini color="#F2A497" /><span>🗼</span></div>
+            <div className="lock-hero card"><PlaneMini color="#F2A497" /><TowerIcon size={58} /></div>
             <h1 className="title">{tr(lang, "tokyoLockTitle")}</h1>
             <p className="subtitle">{tr(lang, "tokyoLockSub")}</p>
             <div className="card plain"><PinPad maxLen={4} check={check} /></div>
@@ -875,7 +914,7 @@ function DayEditor({ day, dayIdx, days, onSave, onSwap, onClose }) {
   );
 }
 
-function Plan({ days, day, setDay, editing }) {
+function Plan({ days, day, setDay, editing, onToggleEdit }) {
   const t = useT();
   const lang = useLang();
   const di = tripDayIndex();
@@ -1016,6 +1055,7 @@ function Plan({ days, day, setDay, editing }) {
         <StopEditor stop={editor.idx == null ? null : stops[editor.idx]} dayIdx={day} days={days} onSave={onSave} onDelete={onDelete} onClose={() => setEditor(null)} />
       ) : null}
       {ask ? <TimeAsk ask={ask} onOk={applyTime} onClose={() => setAsk(null)} /> : null}
+      <EditToggle editing={editing} onToggle={onToggleEdit} />
     </div>
   );
 }
@@ -1146,7 +1186,7 @@ function StayCard({ s, editing, onEdit }) {
   );
 }
 
-function Stay({ editing }) {
+function Stay({ editing, onToggleEdit }) {
   const t = useT();
   const lang = useLang();
   const raw = useShared("trip/stays");
@@ -1180,6 +1220,7 @@ function Stay({ editing }) {
           onDelete={() => { store.remove(`trip/stays/${ed.id}`); setEd(null); }}
         />
       ) : null}
+      <EditToggle editing={editing} onToggle={onToggleEdit} />
     </div>
   );
 }
@@ -1277,7 +1318,7 @@ function Seg({ value, options, onChange, label, full }) {
 function PayerPicker({ value, onChange }) {
   const t = useT();
   const lang = useLang();
-  const opts = [{ id: "kitty", title: t("kittyCash"), sub: t("kittyCashSub"), color: "#F6D27A", icon: "¥" }, ...GROUPS.map((g) => ({ id: g.id, title: t("cardOf", { g: pick(lang, g, "name") }), sub: g.members.join(lang === "en" ? ", " : "、"), color: g.color, icon: "💳" }))];
+  const opts = [{ id: "kitty", title: t("kittyCash"), sub: t("kittyCashSub"), color: "#F6D27A", icon: "¥" }, ...GROUPS.map((g) => ({ id: g.id, title: t("cardOf", { g: pick(lang, g, "name") }), sub: g.members.join(lang === "en" ? ", " : "、"), color: g.color, icon: <CardIcon /> }))];
   return (
     <div className="payer-grid" role="radiogroup" aria-label={t("whoPaid")}>
       {opts.map((o) => (
@@ -1579,7 +1620,7 @@ function ExpenseList({ expenses, editing, cats, rate, onEdit, simple }) {
   );
 }
 
-function Money({ editing, askUnlock, goSettings }) {
+function Money({ editing, askUnlock, goSettings, onToggleEdit }) {
   const t = useT();
   const lang = useLang();
   const kitty = useShared("trip/kitty");
@@ -1660,7 +1701,14 @@ function Money({ editing, askUnlock, goSettings }) {
     <div className="page">
       <div className="page-head">
         <PurseArt />
-        <div><h1 className="title left">{simple ? t("moneyLog") : t("kitty")}</h1><p className="subtitle left">{simple ? t("logSub") : t("kittySub")}</p></div>
+        <div className="ph-body">
+          <div className="ph-row"><h1 className="title left">{simple ? t("moneyLog") : t("kitty")}</h1><EditToggle editing={editing} onToggle={onToggleEdit} variant="pill" /></div>
+          <p className="subtitle left">{simple ? t("logSub") : (
+            <>{lang === "en" ? "Split by shares: " : "按份數攤分："}{GROUPS.map((g, i) => (
+              <span key={g.id} className="nowrap">{i ? (lang === "en" ? " · " : "・") : ""}{pick(lang, g, "name")}{lang === "en" ? ` ×${g.members.length}` : `${g.members.length}份`}</span>
+            ))}</>
+          )}</p>
+        </div>
       </div>
 
       {simple ? (
@@ -2160,7 +2208,7 @@ function Settings({ editing, setEditing, askUnlock, lang, setLang, h12, setH12, 
           <b>{editing ? t("editOn") : t("editOff")}</b>
           <p className="hint">{editing ? t("editOnHint") : t("editOffHint")}</p>
         </div>
-        <button className={"btn" + (editing ? " yellow" : "")} onClick={() => (editing ? setEditing(false) : askUnlock())}>{editing ? `✓ ${t("done")}` : `✏️ ${t("editBtn")}`}</button>
+        <EditToggle editing={editing} onToggle={() => (editing ? setEditing(false) : askUnlock())} variant="pill" />
       </section>
 
       <SetCard title={t("display")}>
@@ -2263,27 +2311,23 @@ function App() {
   const askUnlock = startEdit;
   const pinOk = () => { try { localStorage.setItem(PIN_OK, pin); } catch (e) { /* ignore */ } setEditing(true); setPinOpen(false); };
   const goPlan = (i) => { setDay(i); setTab("plan"); };
-  const showFab = !denied && ["plan", "stay", "money"].includes(tab);
+  const toggleEdit = () => (editing ? setEditing(false) : startEdit());
 
   return (
     <LangCtx.Provider value={lang}>
       <div className={"app" + (lang === "en" ? " en" : "")}>
         <TopNav tab={tab} setTab={setTab} status={status} />
-        {IS_VAULT ? <button className="vault-banner" onClick={lockTokyo}>🗼 {tr(lang, "vaultOn")}・<u>{tr(lang, "vaultLock")}</u></button> : null}
+        {IS_VAULT ? <button className="vault-banner" onClick={lockTokyo}><TowerIcon size={19} ink="#FFFCF6" /> {tr(lang, "vaultOn")}・<u>{tr(lang, "vaultLock")}</u></button> : null}
         <main className={IS_VAULT ? "with-vault" : ""}>
           {denied ? <DeniedScreen /> : null}
           {!denied && tab === "home" && <Home goPlan={goPlan} setTab={setTab} days={days} status={status} />}
-          {!denied && tab === "plan" && <Plan days={days} day={day < days.length ? day : 0} setDay={setDay} editing={editing} />}
+          {!denied && tab === "plan" && <Plan days={days} day={day < days.length ? day : 0} setDay={setDay} editing={editing} onToggleEdit={toggleEdit} />}
           {!denied && tab === "todo" && <Todo />}
-          {!denied && tab === "stay" && <Stay editing={editing} />}
-          {!denied && tab === "money" && <Money editing={editing} askUnlock={askUnlock} goSettings={() => setTab("settings")} />}
+          {!denied && tab === "stay" && <Stay editing={editing} onToggleEdit={toggleEdit} />}
+          {!denied && tab === "money" && <Money editing={editing} askUnlock={askUnlock} goSettings={() => setTab("settings")} onToggleEdit={toggleEdit} />}
           {!denied && tab === "settings" && <Settings editing={editing} setEditing={setEditing} askUnlock={askUnlock} lang={lang} setLang={setLang} h12={h12} setH12={setH12} cfg={cfg} days={days} pin={pin} />}
         </main>
-        {showFab ? (
-          <button className={"edit-fab" + (editing ? " on" : "")} onClick={() => (editing ? setEditing(false) : startEdit())} aria-pressed={editing}>
-            {editing ? <>✓ {tr(lang, "done")}</> : <>✏️ {tr(lang, "editBtn")}</>}
-          </button>
-        ) : null}
+
         {pinOpen ? <PinSheet pin={pin} onOk={pinOk} onClose={() => setPinOpen(false)} /> : null}
       </div>
     </LangCtx.Provider>
