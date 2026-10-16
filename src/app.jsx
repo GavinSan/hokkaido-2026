@@ -318,6 +318,46 @@ function tokyoPlan(days, stays) {
   return map;
 }
 
+/* ---------------- 東京私人行程 v103：京急直通去押上寄行李、Airbnb 16:00 check-in ---------------- */
+function tokyo103(days, stays) {
+  const map = { "trip/meta/v": 103 };
+  const W = (t, name, q, move, extra = {}) => ({ t, name, q, ...(move ? { move } : {}), ...extra });
+  const d0 = days.findIndex((d) => d.d === "10/16");
+  const d2 = days.findIndex((d) => d.d === "10/18");
+  if (d0 >= 0) {
+    const keep = asArray(days[d0].stops).filter((x) => !/酒店放行李|午餐（錦糸町|銀座行街|アルカキット|晚飯（錦糸町/.test(x.name || ""));
+    map[`trip/days/${d0}/intro`] = "羽田搭京急直通都營淺草線去押上（唔使轉車），寄低行李先行街；16:00 Airbnb check-in。";
+    map[`trip/days/${d0}/en`] = { title: "Sapporo → Tokyo", intro: "Keikyu through-train to Oshiage (no change), leave the bags, shop; Airbnb check-in at 16:00." };
+    map[`trip/days/${d0}/stops`] = sortStops([...keep,
+      W("09:45", "京急 → 押上（直通，唔使轉車）", "押上駅", { t: "train", min: 50 }, { note: "唔係 JR（JR Pass 用唔到，Suica／PASMO 得）。B1 京急「羽田空港第1・第2ターミナル」站，搭往押上／青砥／京成高砂／成田空港方向、經都營淺草線嘅車；IC ¥635／人", en: { name: "Keikyu → Oshiage (through train, no change)", note: "Not JR (no JR Pass; Suica/PASMO OK). From Keikyu Haneda T1/T2 stn, take a train bound for Oshiage / Aoto / Keisei-Takasago / Narita Airport via the Toei Asakusa Line; IC ¥635 each" } }),
+      W("10:40", "押上寄行李（ecbo cloak／coin locker）", "押上駅", { t: "walk", min: 3 }, { note: "ecbo cloak app 預約：大喼 ¥800、細喼 ¥500／日（兩大一細約 ¥2,100）；押上站前有 24 小時加盟店。站內大格 locker 好快爆", en: { name: "Leave bags at Oshiage (ecbo cloak / lockers)", note: "Book in the ecbo cloak app: suitcase ¥800, bag ¥500 per day (~¥2,100 for 2 big + 1 small); a 24h partner shop is by the station. Large lockers fill up fast" } }),
+      W("11:00", "東京晴空塔 Solamachi 行街＋午餐", "東京ソラマチ", { t: "walk", min: 3 }, { must: true, note: "商店 10:00–21:00、餐廳 6F/7F/30F/31F 11:00–23:00；4F 日本手信區", en: { name: "Tokyo Skytree Solamachi: shopping + lunch", note: "Shops 10:00–21:00, restaurants 6F/7F/30F/31F 11:00–23:00; 4F Japan souvenir zone" } }),
+      W("13:00", "（可選）銀座：Uniqlo／GU 旗艦、3COINS+plus 西銀座", "ユニクロ 銀座店", { t: "train", min: 15 }, { note: "押上搭都營淺草線直去東銀座約 15 分鐘；15:30 前返押上", en: { name: "(Optional) Ginza: Uniqlo / GU flagships, 3COINS+plus Nishi-Ginza", note: "Toei Asakusa Line from Oshiage direct to Higashi-ginza ~15 min; back at Oshiage by 15:30" } }),
+      W("15:40", "押上攞行李 → 的士去 Airbnb", HOTEL_Q, { t: "taxi", min: 8 }, { note: "短途的士約 ¥700–1,000；拖住行約 10–15 分鐘", en: { name: "Collect bags at Oshiage → taxi to the Airbnb", note: "Short taxi ~¥700–1,000; 10–15 min on foot with bags" } }),
+      W("16:00", "Airbnb check-in（太平 4-13-4）", HOTEL_Q, null, { must: true, addr: "〒130-0012 東京都墨田区太平4丁目13-4", note: "Check-out：星期日 10:00", en: { name: "Airbnb check-in (Taihei 4-13-4)", note: "Check-out: Sunday 10:00" } }),
+      W("18:00", "3COINS+plus アルカキット錦糸町", "アルカキット錦糸町", { t: "walk", min: 10 }, { en: { name: "3COINS+plus Arcakit Kinshicho" } }),
+      W("19:00", "晚飯（錦糸町）", "錦糸町駅", { t: "walk", min: 5 }, { en: { name: "Dinner (Kinshicho)" } }),
+    ]);
+  }
+  if (d2 >= 0) {
+    const keep = asArray(days[d2].stops).filter((x) => !/慢慢食早餐|酒店攞行李/.test(x.name || ""));
+    map[`trip/days/${d2}/stops`] = sortStops([...keep,
+      W("09:15", "執行李／早餐", HOTEL_Q, null, { en: { name: "Pack / breakfast" } }),
+      W("09:50", "Check-out（10:00 前）→ 押上寄行李", "押上駅", { t: "taxi", min: 8 }, { must: true, note: "的士約 ¥700–1,000；ecbo cloak 或站內 locker", en: { name: "Check out (by 10:00) → leave bags at Oshiage", note: "Taxi ~¥700–1,000; ecbo cloak or station lockers" } }),
+      W("13:45", "押上攞行李 → 京急直通去羽田 T3", "羽田空港 第3ターミナル", { t: "train", min: 50 }, { note: "搭往羽田空港方向嘅直通車（經都營淺草線），唔使轉車", en: { name: "Collect bags at Oshiage → through train to Haneda T3", note: "Take a through train bound for Haneda Airport (via Toei Asakusa Line), no change" } }),
+    ]);
+  }
+  const s1 = stays && stays.s1;
+  if (s1) {
+    map["trip/stays/s1/name"] = "Airbnb（錦糸町・太平）";
+    map["trip/stays/s1/addr"] = "〒130-0012 東京都墨田区太平4丁目13-4";
+    map["trip/stays/s1/dates"] = "10/16 16:00 check-in → 10/18（日）10:00 check-out";
+    map["trip/stays/s1/note"] = "Check-in 前／check-out 後可以寄行李喺押上（ecbo cloak）";
+    map["trip/stays/s1/en"] = { name: "Airbnb (Kinshicho · Taihei)", dates: "10/16 check-in 16:00 → Sun 10/18 check-out 10:00", who: "Gavin, Athena" };
+  }
+  return map;
+}
+
 /* ---------------- 首次開／升級：寫入預設資料 ---------------- */
 function useSeedAndMigrate() {
   const meta = useShared("trip/meta");
@@ -348,6 +388,10 @@ function useSeedAndMigrate() {
       } else if (vv < 102) {
         done.current = true;
         store.update(v102);
+      } else if (vv < 103) {
+        if (days === undefined || stays === undefined) return;
+        done.current = true;
+        store.update(tokyo103(asArray(days), stays));
       } else done.current = true;
       return;
     }
